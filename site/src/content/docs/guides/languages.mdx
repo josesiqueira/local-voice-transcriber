@@ -1,0 +1,75 @@
+---
+title: Choose languages
+description: Choose in the extension's popup whether detection uses any language Whisper knows or only the languages you check.
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+import { Image } from 'astro:assets';
+import Src from '../../../components/Src.astro';
+import popupLight from '../../../assets/popup-languages-light.png';
+import popupDark from '../../../assets/popup-languages-dark.png';
+
+By default the local program detects the spoken language of each note among all 100 languages in faster-whisper's list, then transcribes the note in that language.
+
+Detection can pick a related language on short or unclear notes. If the voice notes you receive are always in a few known languages, you can limit detection to those in the extension's popup. The program then picks the most likely language from your list for each note.
+
+## Open the popup
+
+Click the extension's icon in Chrome's toolbar. Chrome does not pin an unpacked extension to the toolbar, so at first the icon is in the **Extensions** menu: click the puzzle piece button at the right of the address bar, then click **Local Voice Transcriber**.
+
+To keep the icon in the toolbar, click the pin button next to **Local Voice Transcriber** in the same menu.
+
+## Limit detection to a list
+
+<Steps>
+
+1. Open the popup.
+
+2. Select **Only these languages**. A search field and the list of the 100 languages appear. The names are in your browser's language, with Whisper's code next to each name.
+
+3. Check each language you receive. Type in the search field to filter the list: it matches part of a name, with or without accents, or the start of a code. The line above the list shows how many languages are chosen and their names.
+
+</Steps>
+
+The choice is saved as soon as you change it. There is no Save button; click outside the popup to close it.
+
+<figure class="lt-figure lt-shot">
+	<Image src={popupLight} alt="The Local Voice Transcriber popup with Only these languages selected. The search field contains the text an, the line below it reads 3 languages chosen: German, Dutch, English, and the list shows languages such as Afrikaans, Albanian and Armenian, each with a checkbox and its Whisper code." class="lt-light-only" width={360} />
+	<Image src={popupDark} alt="The Local Voice Transcriber popup in dark mode with Only these languages selected. The search field contains the text an, the line below it reads 3 languages chosen: German, Dutch, English, and the list shows languages such as Afrikaans, Albanian and Armenian, each with a checkbox and its Whisper code." class="lt-dark-only" width={360} />
+	<figcaption>The popup with three languages chosen, while the list is filtered by a search.</figcaption>
+</figure>
+
+If **Only these languages** is selected but no language is checked, any language is detected.
+
+## What the limit does
+
+- The program considers only the checked languages and picks the most likely of them for each note.
+- If two checked languages are equally likely, the one you checked first wins. To move a language to the end of this order, uncheck it and check it again.
+- The choice applies to the next transcription. You do not need to reload the extension or the WhatsApp Web tab.
+- Notes already transcribed keep their text. There is no way to transcribe a note again in WhatsApp Web; the cached transcripts are removed only when you remove the extension.
+
+<Aside type="caution" title="Check only languages you actually receive">
+A note in a language you did not check is still transcribed, but Whisper is forced to treat it as one of your checked languages. The text is then wrong, or reads like a poor translation. If you receive notes in other languages, add them to the list or select **Any language**.
+</Aside>
+
+## Detect any language again
+
+Open the popup and select **Any language**. While the popup stays open, your checks stay on screen, so selecting **Only these languages** again restores them. Once you close the popup with **Any language** selected, the list is cleared.
+
+## Language codes
+
+The codes are Whisper's. Most are two-letter ISO 639-1 codes, such as `en` (English), `de` (German), `es` (Spanish), `fr` (French), `it` (Italian) and `ja` (Japanese). Three differ: `haw` (Hawaiian) and `yue` (Cantonese) have three letters, and Javanese is `jw`, where ISO 639-1 uses `jv`. The language tag under a transcribed note shows the same code in capitals, such as `EN`.
+
+If the browser has no name for a language, the popup shows only its code.
+
+## Where the setting is stored
+
+The choice is stored in the extension's local storage (`chrome.storage.local`) in your Chrome profile, under the key `settings`, with the codes in the order you checked them:
+
+```json
+{ "languages": ["de", "nl", "en"] }
+```
+
+An empty list means any language. Removing the extension removes the setting.
+
+For each transcription, the service worker reads the setting and adds the list to the request to the local program, only when the list is not empty. See [Native messaging format](/local-voice-transcriber/reference/architecture/#native-messaging-format). The code is in <Src path="extension/popup.js" />, <Src path="extension/background.js" /> and `pick_language` in <Src path="host/languages.py" />.

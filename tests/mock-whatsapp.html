@@ -1,0 +1,150 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>WhatsApp (mock)</title>
+<style>
+  body { font-family: sans-serif; background: #efeae2; color: #111b21; margin: 0; }
+  body.dark { background: #0b141a; color: #e9edef; }
+  #main { max-width: 900px; margin: 0 auto; padding: 16px; }
+  [data-id] { display: flex; flex-direction: column; padding: 2px 0; }
+  .message-in, .message-out { display: flex; }
+  .message-out { justify-content: flex-end; }
+  .bubble { background: #fff; border-radius: 8px; padding: 6px 10px; display: flex; gap: 8px; align-items: center; }
+  body.dark .bubble { background: #202c33; }
+  [role="slider"] { width: 160px; height: 4px; background: #ccc; }
+</style>
+</head>
+<body>
+<div id="app"><div id="main"><div id="list" role="application"></div></div></div>
+<script>
+// Mock of the parts of WhatsApp Web the extension reads. Attribute names follow
+// public knowledge of WhatsApp Web (data-id rows, data-icon spans, role="slider").
+// No personal content.
+const VARIANT = new URLSearchParams(location.search).get("variant") || "detached";
+const AUDIO_URL = "/mock-audio.ogg";
+const list = document.getElementById("list");
+const PLAY_DELAY_MS = Number(new URLSearchParams(location.search).get("delay") || 0);
+// "labelled" copies current WhatsApp Web markup: the play button carries only an
+// aria-label (no data-icon), and the bubble has a ptt-status icon. ?label= sets the button's
+// label, to mimic another interface language.
+const PLAY_LABEL = new URLSearchParams(location.search).get("label") || "Play voice message";
+window.mock = { plays: 0, playsById: {} };
+
+async function audioBlob() {
+  const bytes = await (await fetch(AUDIO_URL)).arrayBuffer();
+  return new Blob([bytes], { type: "audio/ogg; codecs=opus" });
+}
+
+function setIcon(row, name) {
+  if (VARIANT === "labelled") {
+    row.querySelector("button").setAttribute("aria-label", name === "audio-pause" ? "Pause voice message" : PLAY_LABEL);
+    return;
+  }
+  row.querySelector("[data-icon]").setAttribute("data-icon", name);
+}
+
+async function play(row) {
+  window.mock.plays += 1;
+  const currentId = row.querySelector("[data-id]").getAttribute("data-id");
+  window.mock.playsById[currentId] = (window.mock.playsById[currentId] || 0) + 1;
+  if (PLAY_DELAY_MS) await new Promise((resolve) => setTimeout(resolve, PLAY_DELAY_MS));
+  if (VARIANT === "broken") return;
+  if (VARIANT === "webaudio") {
+    const ctx = new AudioContext();
+    const buffer = await ctx.decodeAudioData(await (await fetch(AUDIO_URL)).arrayBuffer());
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    source.connect(ctx.destination);
+    source.start();
+    return;
+  }
+  let audio = row.querySelector("audio");
+  if (!audio || !audio.src) {
+    const url = URL.createObjectURL(await audioBlob());
+    if (VARIANT === "attached") {
+      audio = document.createElement("audio");
+      row.querySelector(".bubble").appendChild(audio);
+    } else {
+      audio = new Audio();
+    }
+    audio.src = url;
+    audio.onpause = () => setIcon(row, "audio-play");
+    audio.onended = () => setIcon(row, "audio-play");
+  }
+  setIcon(row, "audio-pause");
+  await audio.play();
+}
+
+function voiceRow(id, outgoing) {
+  const row = document.createElement("div");
+  row.setAttribute("role", "row");
+  row.innerHTML = VARIANT === "labelled" ? `
+    <div data-id="${id}">
+      <div class="${outgoing ? "message-out" : "message-in"}">
+        <div class="bubble">
+          <div><div><button type="button" aria-label="${PLAY_LABEL}"><div></div></button></div>
+            <div><span aria-label="Voice message"></span><div><div role="slider" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div></div></div></div>
+          <div><button type="button" aria-label="Change playback speed, currently 1×"><div></div></button>
+            <span data-icon="ptt-status"><svg></svg></span></div>
+        </div>
+      </div>
+    </div>` : `
+    <div data-id="${id}">
+      <div class="${outgoing ? "message-out" : "message-in"}">
+        <div class="bubble">
+          <button type="button" aria-label="Play voice message"><span data-icon="audio-play"></span></button>
+          <div role="slider" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+          <span>0:02</span>
+        </div>
+      </div>
+    </div>`;
+  row.querySelector("button").addEventListener("click", () => play(row));
+  if (VARIANT === "preloaded") {
+    audioBlob().then((blob) => {
+      const audio = document.createElement("audio");
+      audio.src = URL.createObjectURL(blob);
+      row.querySelector(".bubble").appendChild(audio);
+      row.dataset.ready = "1";
+    });
+  }
+  return row;
+}
+
+function textRow(id) {
+  const row = document.createElement("div");
+  row.setAttribute("role", "row");
+  row.innerHTML = `<div data-id="${id}"><div class="message-in"><div class="bubble"><span>Hello there</span></div></div></div>`;
+  return row;
+}
+
+const rowOf = (id) => document.querySelector(`[data-id="${CSS.escape(id)}"]`).parentElement;
+
+Object.assign(window.mock, {
+  addVoiceRow(id, outgoing = false) { list.appendChild(voiceRow(id, outgoing)); },
+  addTextRow(id) { list.appendChild(textRow(id)); },
+  removeRow(id) { rowOf(id).remove(); },
+  rerenderRow(id) {
+    const old = rowOf(id);
+    const outgoing = !!old.querySelector(".message-out");
+    old.replaceWith(voiceRow(id, outgoing));
+  },
+  recycleRow(oldId, newId) {
+    // A virtualized list may reuse the same DOM node for another message.
+    rowOf(oldId).querySelector("[data-id]").setAttribute("data-id", newId);
+  },
+  addNoise(n) {
+    for (let i = 0; i < n; i++) {
+      const span = document.createElement("span");
+      span.className = "noise";
+      document.getElementById("main").appendChild(span);
+    }
+  },
+});
+
+window.mock.addVoiceRow("false_111111111111@c.us_3EB0AAAA0001");
+window.mock.addTextRow("false_111111111111@c.us_3EB0AAAA0002");
+window.mock.addVoiceRow("true_111111111111@c.us_3EB0AAAA0003", true);
+</script>
+</body>
+</html>

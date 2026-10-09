@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Local Voice Transcriber</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <main>
+    <header class="brand">
+      <img src="icons/icon32.png" alt="" width="16" height="16">
+      <span>Local Voice Transcriber</span>
+    </header>
+
+    <h1>Languages</h1>
+    <p class="help">The language of each note is detected among the languages chosen here.</p>
+
+    <fieldset class="modes">
+      <legend class="visually-hidden">Languages to detect</legend>
+      <label class="mode">
+        <input type="radio" name="mode" value="any" aria-labelledby="mode-any-title" aria-describedby="mode-any-help">
+        <span class="mode-text">
+          <span class="mode-title" id="mode-any-title">Any language</span>
+          <span class="mode-help" id="mode-any-help">All 100 languages Whisper knows</span>
+        </span>
+      </label>
+      <label class="mode">
+        <input type="radio" name="mode" value="only" aria-labelledby="mode-only-title" aria-describedby="mode-only-help">
+        <span class="mode-text">
+          <span class="mode-title" id="mode-only-title">Only these languages</span>
+          <span class="mode-help" id="mode-only-help">Only the languages checked below</span>
+        </span>
+      </label>
+    </fieldset>
+
+    <section class="picker" id="picker" hidden>
+      <label class="visually-hidden" for="search">Search languages</label>
+      <input type="search" id="search" placeholder="Search languages" autocomplete="off" spellcheck="false" aria-controls="list">
+      <p class="count" id="count" aria-live="polite"></p>
+      <ul class="list" id="list" aria-label="Languages"></ul>
+      <p class="empty" id="no-match" hidden>No language matches this search.</p>
+    </section>
+
+    <p class="error" id="error" role="alert" hidden>Could not save the choice. Try again.</p>
+    <p class="note">The choice applies to the next transcription. Notes already transcribed keep their text.</p>
+  </main>
+  <script src="languages.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

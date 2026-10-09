@@ -1,0 +1,72 @@
+---
+title: Configuration
+description: The language setting in the extension's popup, the environment variables the program reads and sets, and the settings in host/config.py.
+---
+
+import Src from '../../../components/Src.astro';
+
+The only setting most people change is the language list, in the extension's popup. Everything else is either an environment variable or a constant in <Src path="host/config.py" />.
+
+## Languages
+
+Click the extension's icon in Chrome's toolbar to open its popup, then choose **Any language** (the default) or **Only these languages** and check the languages to detect. See [Choose languages](/local-voice-transcriber/guides/languages/).
+
+| Property | Value |
+| --- | --- |
+| Stored in | The extension's `chrome.storage.local`, in your Chrome profile |
+| Key | `settings` |
+| Value | `{ "languages": ["de", "nl"] }`: Whisper language codes in the order they were checked. Ties in detection go to the code that comes first. An empty list, or no entry, means any language. |
+| Takes effect | On the next transcription. Notes already transcribed keep their text. |
+| Removed by | Removing the extension |
+
+The service worker adds the list to the request to the local program only when it is not empty. The program accepts at most 100 unique codes from Whisper's list and replies `invalid_request` otherwise. See [Native messaging format](/local-voice-transcriber/reference/architecture/#native-messaging-format).
+
+## Environment variables
+
+Chrome starts the program with Chrome's own environment. A variable you set in a terminal reaches the program only if Chrome was started from that terminal, or if you set it for your whole session.
+
+Read by the program, the installer and the uninstaller:
+
+| Variable | Effect | Default |
+| --- | --- | --- |
+| `HF_HOME`, `HF_HUB_CACHE` | Where the Hugging Face library keeps the model. The installer and the program must see the same value. | `HF_HOME` is `~/.cache/huggingface`; models go in its `hub` folder |
+
+Read by the program and the uninstaller only:
+
+| Variable | Effect | Default |
+| --- | --- | --- |
+| `WAT_LOG_DIR` | Folder for `host.log`. `uninstall.sh` removes this folder; `install.sh` does not read it. | `~/.local/state/local-voice-transcriber` |
+
+Set by <Src path="host/run-host.sh" /> for every request:
+
+| Variable | Value | Why |
+| --- | --- | --- |
+| `HF_HUB_OFFLINE` | `1` | The Hugging Face library never connects to the network. |
+| `HF_HUB_DISABLE_TELEMETRY` | `1` | Turns off Hugging Face telemetry. The installer sets it too. |
+| `ORT_DISABLE_TELEMETRY` | `1` | Turns off the usage telemetry that onnxruntime, the library that runs the speech filter, would otherwise send to Microsoft. The installer sets it too. |
+| `LD_LIBRARY_PATH` | The cuBLAS and cuDNN folders inside `host/.venv`, then any existing value | Lets CTranslate2 find the CUDA libraries installed as Python packages. |
+
+The kernel network block in <Src path="host/netblock.py" /> has no setting. No variable or constant turns it off; if it cannot be installed, the program transcribes nothing. See [How the program stays offline](/local-voice-transcriber/start/how-it-works/#how-the-program-stays-offline).
+
+Set by <Src path="install.sh" /> while it downloads the model:
+
+| Variable | Value | Why |
+| --- | --- | --- |
+| `HF_HUB_DISABLE_SHARED_BLOBS` | `1` | Keeps the model file inside its own cache folder instead of the shared `~/.cache/huggingface/hub/blobs/` folder, so deleting the model folder frees the space. |
+
+## Settings in host/config.py
+
+These are constants in the source. If you change one, keep your change when you update, and run `./install.sh` again if the model settings changed.
+
+| Constant | Value | Meaning |
+| --- | --- | --- |
+| `MODEL_NAME` | `large-v3-turbo` | faster-whisper's name for the model; it maps to `mobiuslabsgmbh/faster-whisper-large-v3-turbo` on Hugging Face. |
+| `MODEL_REVISION` | `0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf` | The exact commit of the model repository to download and load. |
+| `GPU_DEVICE`, `GPU_COMPUTE_TYPE` | `cuda`, `int8_float16` | Device and weight format for the first attempt. |
+| `CPU_DEVICE`, `CPU_COMPUTE_TYPE` | `cpu`, `int8` | Device and weight format for the fallback. |
+| `CPU_THREADS` | Half the logical CPUs, at least 1 | Threads for CPU transcription, about one per physical core. |
+| `BEAM_SIZE` | `5` | Beam search width for decoding. |
+| `MAX_AUDIO_BYTES` | 40 MiB | Largest audio accepted. Keep equal to the same constant in <Src path="extension/content.js" />. |
+| `MAX_REPLY_BYTES` | 1 MiB | Chrome's limit for one message from the program. |
+
+Before it loads the model, the program checks the audio for speech with faster-whisper's voice activity detection (the Silero VAD model, run by onnxruntime). Audio without detected speech ends with "No speech found in this message". The same filter (`vad_filter=True`) skips silent parts during language detection and transcription.

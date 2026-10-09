@@ -1,0 +1,62 @@
+---
+title: How it works
+description: The path a voice note takes from the WhatsApp Web tab to the local program and back, and why the program exits after every request.
+---
+
+import DataFlow from '../../../components/DataFlow.astro';
+import Src from '../../../components/Src.astro';
+
+Everything happens inside your computer. Google Chrome runs the WhatsApp Web tab and the extension, and starts the local program when it is needed.
+
+<DataFlow />
+
+## What happens when you press T
+
+1. The content script finds the audio. It runs only on `https://web.whatsapp.com/*` and adds the T button under each voice note. When you press the button, the script looks for the note's audio in the page. If the note has an audio element with its data in the page, the script reads it from the page's memory.
+2. Otherwise, which is the usual case in today's WhatsApp Web, the script presses the note's own play button with the sound muted, captures the audio as soon as playback starts, then pauses and rewinds the note. The capture waits at most 20 seconds.
+3. The service worker passes the audio to the local program. The content script sends the audio to the extension's service worker, which calls `chrome.runtime.sendNativeMessage`. Chrome starts the local program, writes the request to the program's standard input, and reads the reply from its standard output. This is Chrome native messaging. No network port is opened at any point.
+4. The local program transcribes. It decodes the audio, checks that it contains speech, detects the language (only among the languages chosen in the extension's popup, if you chose any) and transcribes it with faster-whisper and Whisper large-v3-turbo. It tries the GPU first and uses the CPU if anything goes wrong on the GPU.
+5. The program replies and exits. The reply holds the text, the language code and the device that was used. The program then exits, which releases the memory it used on the GPU.
+6. The text appears under the note. The content script shows the text, the language tag (for example EN) and a Copy link, and stores the result in the extension's storage on your computer.
+
+## Why the program exits after every request
+
+`chrome.runtime.sendNativeMessage` starts a new process for each message, and the process ends after it replies. That has three effects:
+
+- The program does not run between clicks. There is no background service, no server and no port to protect.
+- GPU memory is used only while a note is being transcribed.
+- Each request loads the model from disk again. After the first request the operating system usually has the model files in its file cache, so this is fast. The first request after a reboot takes longer.
+
+The extension sends one request at a time. If you press T on several notes, they are transcribed one after the other, because two copies of the model loaded at the same time may not fit in GPU memory.
+
+## Why native messaging
+
+Native messaging is Chrome's standard way for an extension to talk to a program installed on the same computer. Chrome only starts programs that are registered in a host manifest file, and only for the extensions listed in that file. The installer registers one program, `host/run-host.sh`, for one extension ID. See [Architecture](/local-voice-transcriber/reference/architecture/) for the message format.
+
+## How the program stays offline
+
+The launcher script <Src path="host/run-host.sh" /> sets three environment variables before Python starts:
+
+```sh
+export HF_HUB_OFFLINE=1
+export HF_HUB_DISABLE_TELEMETRY=1
+export ORT_DISABLE_TELEMETRY=1
+```
+
+`HF_HUB_OFFLINE=1` makes the Hugging Face library refuse every network connection. The program also asks for the model with `local_files_only=True` in <Src path="host/engine.py" />, at a fixed commit, so if the model is missing it stops with "Model not downloaded. Run install.sh" instead of downloading it. Either setting alone keeps the model lookup offline; the program uses both. `HF_HUB_DISABLE_TELEMETRY=1` turns off Hugging Face telemetry.
+
+`ORT_DISABLE_TELEMETRY=1` turns off the usage telemetry built into onnxruntime, the library that runs the speech filter. Without it, onnxruntime sends usage events to Microsoft (`mobile.events.data.microsoft.com`): a transcription traced with `strace` looked up that server and connected to it. With the variable set, the same trace showed no internet connection. [Check 7 on the verification page](/local-voice-transcriber/privacy/verify/#7-trace-the-programs-network-system-calls) repeats this test on your computer.
+
+These settings tell the libraries not to connect. Under them, the program blocks its own network access at the operating system level, so the kernel refuses if anything tries anyway. The first thing <Src path="host/transcribe_host.py" /> does, before it imports faster-whisper, CTranslate2 or onnxruntime and before it reads the request, is install a seccomp filter from <Src path="host/netblock.py" />. Seccomp is the Linux kernel feature behind systemd's `RestrictAddressFamilies=` setting, and installing a filter needs no root rights. After that:
+
+- `socket()` fails with "Permission denied" (`EACCES`) for every address family except `AF_UNIX`, local sockets that the NVIDIA driver uses, and `AF_NETLINK`, queries to the kernel that never leave the computer.
+- Setting up io_uring is refused too, because io_uring can create sockets without calling `socket()`.
+- The filter covers every thread, including threads started by native libraries, and any child process inherits it. The program cannot remove it.
+
+If the filter cannot be installed, the program transcribes nothing and replies with "Could not block network access, so nothing was transcribed. See host.log". The filter is written for Linux on x86_64, the platform this tool supports. The log's start line ends with `network_blocked=True` when the block is in place.
+
+The model version is pinned to a fixed commit of [`mobiuslabsgmbh/faster-whisper-large-v3-turbo`](https://huggingface.co/mobiuslabsgmbh/faster-whisper-large-v3-turbo) in <Src path="host/config.py" />, so every install gets the same files.
+
+## Where the GPU libraries come from
+
+The CUDA libraries that faster-whisper needs (cuBLAS and cuDNN for CUDA 12) are installed as Python packages inside the program's environment. The launcher adds them to `LD_LIBRARY_PATH`. You do not need to install the CUDA toolkit. You do need an NVIDIA driver for the GPU to be used. On the GPU the model runs with `int8_float16` weights; on the CPU it runs with `int8`.

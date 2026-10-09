@@ -1,0 +1,111 @@
+---
+// Replaces Starlight's Hero on the landing page. It reads the same frontmatter fields (title,
+// tagline, actions); the difference is the image, which is the inline illustration, so it
+// follows the light and dark theme. Action links are used as written in frontmatter, where
+// starlight-links-validator checks them.
+import { LinkButton } from '@astrojs/starlight/components';
+import VoiceNote from './VoiceNote.astro';
+
+// Starlight's page title id (PAGE_TITLE_ID in its source); the skip link and the TOC point at it.
+const PAGE_TITLE_ID = '_top';
+
+const { data } = Astro.locals.starlightRoute.entry;
+const { title = data.title, tagline, actions = [] } = data.hero || {};
+---
+
+<div class="hero">
+	<div class="art">
+		<VoiceNote />
+	</div>
+	<div class="stack">
+		<h1 id={PAGE_TITLE_ID} data-page-title set:html={title} />
+		{tagline && <p class="tagline" set:html={tagline} />}
+		{
+			actions.length > 0 && (
+				<div class="actions">
+					{actions.map(({ link, text, variant, icon }) => (
+						<LinkButton href={link} variant={variant} icon={icon?.name}>
+							{text}
+						</LinkButton>
+					))}
+				</div>
+			)
+		}
+	</div>
+</div>
+
+<style>
+	.hero {
+		display: grid;
+		grid-template-columns: 100%;
+		gap: 2.5rem;
+		align-items: center;
+		padding-block: 2.5rem 1.5rem;
+	}
+	.art {
+		order: 2;
+		width: min(100%, 26rem);
+		margin-inline: auto;
+	}
+	.stack {
+		display: flex;
+		flex-direction: column;
+		gap: 1.25rem;
+	}
+	h1 {
+		font-size: clamp(2rem, 1.2rem + 3.4vw, 3.5rem);
+		line-height: 1.08;
+		font-weight: 600;
+		letter-spacing: -0.025em;
+		color: var(--sl-color-white);
+		max-width: 16ch;
+		text-wrap: balance;
+	}
+	.tagline {
+		margin: 0;
+		font-size: clamp(var(--sl-text-base), 0.9rem + 0.6vw, var(--sl-text-xl));
+		line-height: 1.55;
+		color: var(--sl-color-gray-2);
+		max-width: 46ch;
+	}
+	.actions {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.75rem 1.25rem;
+		margin-top: 0.5rem;
+	}
+	/* Narrow screens: the two main buttons share one row, the source link sits under them. */
+	@media (max-width: 49.99rem) {
+		.hero {
+			gap: 2rem;
+			padding-block: 1.5rem 1rem;
+		}
+		.actions {
+			display: grid;
+			grid-template-columns: 1fr 1fr;
+			gap: 0.75rem;
+		}
+		.actions :global(.sl-link-button) {
+			justify-content: center;
+			margin: 0;
+		}
+		.actions :global(.sl-link-button:nth-child(3)) {
+			grid-column: 1 / -1;
+			justify-self: center;
+			font-size: var(--sl-text-sm);
+		}
+		.art {
+			width: min(100%, 20rem);
+		}
+	}
+	@media (min-width: 50rem) {
+		.hero {
+			grid-template-columns: 7fr 5fr;
+			gap: 4rem;
+			padding-block: clamp(3rem, 1rem + 8vmin, 7rem) 3rem;
+		}
+		.art {
+			width: 100%;
+		}
+	}
+</style>

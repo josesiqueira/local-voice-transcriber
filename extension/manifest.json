@@ -1,0 +1,29 @@
+{
+  "manifest_version": 3,
+  "name": "Local Voice Transcriber",
+  "version": "0.1.0",
+  "description": "Transcribes voice notes in WhatsApp Web on your own computer with a local Whisper model. Not affiliated with WhatsApp or Meta.",
+  "icons": { "16": "icons/icon16.png", "32": "icons/icon32.png", "48": "icons/icon48.png", "128": "icons/icon128.png" },
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAwFkCONUfwvYEXf0QHW5E/MpBLvfUAkgo+Y6Swl9sEO2VOV9clepDt1kX4VQCzNC6GJHUAml67RHgFS7Tv4TmlopkgJd9XdGbCINGhjQ6mz2m/qCVGrQYRupMmXKRdy+GKyNCIU7W9+hrHCYe9ANhceQFdoPyP+XbNbVwgMM3f/ueu4VaJWHJXceXWaIXnooWv43t+OD7ri1ux0Cz2qfYLnBzod8sHAeW51XOPgrjPZ18CCQBrBZ6+AEIl2UardjvSSadB1U2akcEQacOBClee/J/0oshBqQN8QPj8WtyX0olJl3HHw4K0Fti115mh9K9N7AlXjorDDASvXtL4iczvwIDAQAB",
+  "action": {
+    "default_title": "Local Voice Transcriber",
+    "default_popup": "popup.html",
+    "default_icon": { "16": "icons/icon16.png", "32": "icons/icon32.png", "48": "icons/icon48.png", "128": "icons/icon128.png" }
+  },
+  "permissions": ["nativeMessaging", "storage"],
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [
+    {
+      "matches": ["https://web.whatsapp.com/*"],
+      "js": ["page-hook.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": ["https://web.whatsapp.com/*"],
+      "js": ["selectors.js", "ui.js", "capture.js", "content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ]
+}

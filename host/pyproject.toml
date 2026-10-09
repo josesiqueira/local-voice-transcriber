@@ -1,0 +1,18 @@
+[project]
+name = "local-voice-transcriber-host"
+version = "0.1.0"
+description = "Native messaging host that transcribes WhatsApp voice notes with faster-whisper"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "faster-whisper==1.2.1",
+    # faster-whisper 1.2.1 calls av.open(..., metadata_errors=...), which PyAV 19 removed.
+    "av>=15,<19",
+    "nvidia-cublas-cu12",
+    "nvidia-cudnn-cu12>=9,<10",
+]
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[tool.uv]
+package = false

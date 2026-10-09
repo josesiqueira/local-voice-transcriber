@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#151210"/>
+  <rect x="0" y="0" width="1200" height="6" fill="#bf5914"/>
+  <g transform="translate(80 84) scale(3)">
+    <rect width="32" height="32" rx="7.5" fill="#bf5914"/>
+    <g fill="none" stroke="#fff8f2" stroke-width="3" stroke-linecap="round">
+      <path d="M7.5 13.5v5M12 9v14"/>
+      <path d="M17.5 11h7M17.5 16h7M17.5 21h4"/>
+    </g>
+  </g>
+  <text x="80" y="300" font-family="IBM Plex Sans OG" font-weight="600" font-size="76" letter-spacing="-1.5" fill="#ffffff">Local Voice Transcriber</text>
+  <text x="80" y="368" font-family="IBM Plex Sans OG" font-size="34" fill="#cbc6c4">Transcribe WhatsApp Web voice notes on your own computer.</text>
+  <text x="80" y="414" font-family="IBM Plex Sans OG" font-size="34" fill="#cbc6c4">Whisper large-v3-turbo on your GPU or CPU. No audio leaves it.</text>
+  <g font-family="IBM Plex Sans OG" font-size="24" fill="#efeae8">
+    <rect x="80" y="500" width="292" height="52" rx="26" fill="none" stroke="#5e5a58" stroke-width="2"/>
+    <text x="226" y="534" text-anchor="middle">Open source, AGPL-3.0</text>
+    <rect x="388" y="500" width="184" height="52" rx="26" fill="none" stroke="#5e5a58" stroke-width="2"/>
+    <text x="480" y="534" text-anchor="middle">No telemetry</text>
+    <rect x="588" y="500" width="310" height="52" rx="26" fill="none" stroke="#5e5a58" stroke-width="2"/>
+    <text x="743" y="534" text-anchor="middle">Linux and Google Chrome</text>
+  </g>
+</svg>

@@ -1,0 +1,37 @@
+---
+title: Requirements
+description: Operating system, browser, tools, disk space and optional GPU needed to install and run the transcriber.
+---
+
+import { Badge } from '@astrojs/starlight/components';
+
+Check these before you install.
+
+| Requirement | Details |
+| --- | --- |
+| Operating system | Linux on x86_64 (64-bit Intel or AMD). |
+| Browser | Google Chrome installed from Google's .deb or .rpm package, so that it is at `/usr/bin/google-chrome`. Flatpak and Snap builds are not supported. |
+| `uv` | The Python package and project manager from Astral. The installer looks for it on your `PATH` and in `~/.local/bin/uv`. Install it with the [official instructions](https://docs.astral.sh/uv/getting-started/installation/). |
+| `git` | To get the code and to update it later. |
+| Disk space | About 4.5 GB free: about 2.6 GB for the Python environment and about 1.6 GB for the model. |
+| Network | Needed only to install and update. |
+| GPU <Badge text="Optional" variant="note" /> | An NVIDIA GPU with the NVIDIA driver installed. The CUDA libraries are installed by the installer. Without a usable GPU, the CPU is used. |
+| Permissions | A normal user account. The installer does not use `sudo` and writes only to your home directory and the repository folder. |
+
+You do not need Python installed. `uv` reads the version the program needs (Python 3.12) and downloads it if your system does not have it.
+
+## GPU or CPU
+
+The program tries the GPU first on every request and uses the CPU if the GPU attempt fails for any reason: no NVIDIA GPU, no driver, a driver too old for CUDA 12, or not enough free GPU memory.
+
+- On a recent NVIDIA GPU, a voice note is usually transcribed several times faster than it takes to play.
+- On the CPU, transcription is several times slower than on the GPU. Short notes are still practical; long notes take a while.
+- The first transcription after a reboot takes longer on either device, while the model is read from disk.
+
+AMD and Intel GPUs are not used. On those computers the program runs on the CPU.
+
+## Why Google Chrome from Google's package
+
+Chrome finds native programs through host manifest files in a fixed folder, `~/.config/google-chrome/NativeMessagingHosts/` for Google Chrome on Linux. Flatpak and Snap builds of Chrome and Chromium run in a sandbox: they look for manifests in a different folder and by default cannot start programs outside the sandbox. The installer also checks that `/usr/bin/google-chrome` exists and stops if it does not.
+
+See [Platform support](/local-voice-transcriber/reference/platform-support/) for other systems and browsers.

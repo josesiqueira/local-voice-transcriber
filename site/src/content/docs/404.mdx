@@ -1,0 +1,19 @@
+---
+title: Page not found
+description: This page does not exist. Links to the install guide, troubleshooting and the start page.
+template: splash
+editUrl: false
+pagefind: false
+---
+
+import { LinkCard, CardGrid } from '@astrojs/starlight/components';
+import { pageUrl } from '../../consts';
+
+There is no page at this address. Check the address, or use the search at the top of the page.
+
+<CardGrid>
+	<LinkCard title="Start page" description="What the extension does and how it keeps audio on your computer." href={pageUrl()} />
+	<LinkCard title="Install" description="Requirements and the install steps." href={pageUrl('start/install/')} />
+	<LinkCard title="Troubleshooting" description="Every message the extension can show, with its cause and fix." href={pageUrl('guides/troubleshooting/')} />
+	<LinkCard title="Privacy" description="What happens to a voice note and what leaves your computer." href={pageUrl('privacy/privacy/')} />
+</CardGrid>

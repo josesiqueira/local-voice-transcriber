@@ -1,0 +1,108 @@
+---
+title: Architecture
+description: Components and files, the order of events on a click, the native messaging message format and limits, and every error code with the caption text it shows.
+---
+
+import Src from '../../../components/Src.astro';
+
+## Components
+
+| File | Runs in | Role |
+| --- | --- | --- |
+| <Src path="extension/manifest.json" /> | Chrome | Manifest V3. Two permissions, content scripts on `https://web.whatsapp.com/*`, the toolbar icon and popup (`action`), and a fixed `key` that gives the extension the ID `aclgfofogdialjfpeplknjloiemchjcf`. |
+| <Src path="extension/page-hook.js" /> | The page's own JavaScript context, from `document_start` | Wraps three standard browser functions: `URL.createObjectURL` (keeps the 20 most recent audio Blobs), `HTMLMediaElement.prototype.play` (mutes, captures, then pauses and rewinds when the extension asked for a capture) and `decodeAudioData` (captures audio played through Web Audio). It does not touch WhatsApp's own modules. |
+| <Src path="extension/selectors.js" /> | Content script | Every lookup in WhatsApp Web's page: `data-id` on messages, `data-icon` on icons, `role="slider"` on the voice note seek bar, the `<audio>` element, and the play button's `aria-label`, matched for a list of common languages with a fallback to the button next to the seek bar. No generated class names. |
+| <Src path="extension/capture.js" /> | Content script | Asks the page hook for a note's audio: an existing `blob:` source first, otherwise it presses the note's play button. One capture at a time, 20 second timeout. |
+| <Src path="extension/ui.js" /> | Content script | The T button, the status text, the caption with language tag and Copy link, and the error texts. |
+| <Src path="extension/content.js" /> | Content script | Watches the page for messages, adds the buttons, sends requests to the service worker and reads and writes the cache. |
+| <Src path="extension/background.js" /> | Service worker | Receives requests on a port named `transcribe`, adds the languages chosen in the popup, runs the requests one at a time with `chrome.runtime.sendNativeMessage`, and maps failures to error codes. |
+| <Src path="extension/popup.html" /> | Popup | The page that opens when you click the extension's icon in the toolbar. Set as `default_popup` under `action` in the manifest. |
+| <Src path="extension/popup.js" /> | Popup | The language choice: **Any language** or **Only these languages**, with a searchable checkbox list. Names come from the browser (`Intl.DisplayNames`). Saves the choice to `chrome.storage.local` under the key `settings` on every change. Makes no network requests. |
+| <Src path="extension/popup.css" /> | Popup | The popup's styles, with a light and a dark theme that follow the system setting. |
+| <Src path="extension/languages.js" /> | Popup | `WHISPER_LANGUAGES`: the 100 language codes Whisper knows, in faster-whisper's order. A test checks it against the installed faster-whisper. |
+| <Src path="host/run-host.sh" /> | Local program | Launcher that Chrome starts. Adds the CUDA libraries from the Python environment to `LD_LIBRARY_PATH`, sets `HF_HUB_OFFLINE=1`, `HF_HUB_DISABLE_TELEMETRY=1` and `ORT_DISABLE_TELEMETRY=1`, and starts Python. |
+| <Src path="host/transcribe_host.py" /> | Local program | Installs the network block, then reads one request from standard input, validates it (including the optional `languages` list), writes one reply to standard output, exits. Sends everything else that would reach standard output or standard error to the log file. |
+| <Src path="host/netblock.py" /> | Local program | Installs a seccomp filter so the Linux kernel refuses the program every network socket (all address families except `AF_UNIX` and `AF_NETLINK`) and io_uring. Called first by `transcribe_host.py`, before any third-party library is imported. Linux on x86_64 only. |
+| <Src path="host/native_protocol.py" /> | Local program | Message framing. |
+| <Src path="host/engine.py" /> | Local program | Decodes the audio to 16 kHz mono, checks for speech, finds the model in the local cache, and transcribes on the GPU with CPU fallback. |
+| <Src path="host/languages.py" /> | Local program | `pick_language`: picks the most likely language among the ones in the request. Ties go to the code that comes first. |
+| <Src path="host/config.py" /> | Local program | All settings in one place. See [Configuration](/local-voice-transcriber/reference/configuration/). |
+| <Src path="host/native_client.py" /> | Command line | Sends one request to the program the way Chrome does. Used by the installer's self-check and the tests. |
+
+## What happens on a click
+
+1. `content.js` marks the note as working and asks `capture.js` for the audio.
+2. `capture.js` reads the note's `<audio>` source if it is a `blob:` URL. Otherwise it arms the page hook and clicks the note's play button. The page hook mutes the element, takes the Blob behind it, then pauses, rewinds and unmutes. If WhatsApp decodes the audio through Web Audio instead, the hook copies the buffer passed to `decodeAudioData`.
+3. `content.js` checks the size (at most 40 MiB), encodes the audio as base64 and sends it to the service worker over a long-lived port. While it waits, it sends a `ping` message every 20 seconds so Chrome keeps the service worker running.
+4. `background.js` queues the request behind any other request. When its turn comes, it reads the languages chosen in the popup from `chrome.storage.local`, adds them to the request if the list is not empty, and calls `chrome.runtime.sendNativeMessage("io.github.josesiqueira.local_voice_transcriber", ...)`.
+5. Chrome reads the host manifest, starts `host/run-host.sh` with the caller's origin as its argument, and writes the request to its standard input.
+6. `transcribe_host.py` installs the network block from `netblock.py` before it imports the speech libraries. It then reads one frame, validates it, decodes the audio, runs the speech check, and calls the engine. If the request has a `languages` list, the engine picks the most likely language from that list; otherwise it uses the language Whisper detects. The engine tries the GPU (`cuda`, `int8_float16`). On any GPU error it logs the error and tries the CPU (`cpu`, `int8`).
+7. The program writes one reply frame and exits.
+8. `background.js` checks the reply and posts the result to the content script, which shows the caption and writes the cache entry.
+
+## Native messaging format
+
+Each message is a 32-bit message length in native byte order, followed by that many bytes of UTF-8 JSON. This is Chrome's standard framing.
+
+Request, from the service worker to the program:
+
+```json
+{ "audio_b64": "<base64 audio>", "mime": "audio/ogg; codecs=opus", "languages": ["de", "nl"] }
+```
+
+`languages` is optional. The service worker adds it only when languages are chosen in the popup, in the order they were checked. The program accepts a list of at most 100 unique Whisper language codes. Missing or `[]` means any language. Any other value, including `null` or an unknown code, gives `invalid_request`.
+
+Reply on success:
+
+```json
+{ "ok": true, "text": "Transcribed text", "language": "en", "device": "cuda", "seconds": 3.42 }
+```
+
+`device` is `cuda` or `cpu`. `seconds` is the time from the start of the program to the reply.
+
+Reply on failure:
+
+```json
+{ "ok": false, "error": "model_missing", "message": "Model not downloaded. Run install.sh" }
+```
+
+Limits:
+
+| Limit | Value | Set by |
+| --- | --- | --- |
+| Message from the program to Chrome | 1 MB | Chrome. The program checks it and replies `reply_too_large` instead. |
+| Message from Chrome to the program | 64 MiB | Chrome |
+| Audio size | 40 MiB, before base64 encoding | `MAX_AUDIO_BYTES` in <Src path="extension/content.js" /> and <Src path="host/config.py" />. Base64 adds a third, so 40 MiB of audio stays below Chrome's 64 MiB. |
+| Capture wait | 20 seconds | `TIMEOUT_MS` in <Src path="extension/capture.js" /> |
+| One extension call | 5 minutes, if it applies | Chrome documents this limit for service worker events and API calls in general. Not tested with `sendNativeMessage`. The extension sets no limit of its own. |
+
+### Messages between the content script and the service worker
+
+The content script opens a port named `transcribe` and sends:
+
+```json
+{ "type": "transcribe", "messageId": "<WhatsApp message ID>", "audio_b64": "<base64 audio>", "mime": "audio/ogg" }
+```
+
+and `{ "type": "ping" }` every 20 seconds. The service worker answers with one result object, `{ "ok": true, "text", "language", "device", "seconds" }` or `{ "ok": false, "error", "message" }`, and closes the port. The message ID is used only as the cache key and is not sent to the program.
+
+## Error codes
+
+The caption text is what you see under the voice note. It comes from `ERROR_TEXT` in <Src path="extension/ui.js" />.
+
+| Code | Set by | Caption text |
+| --- | --- | --- |
+| `host_not_installed` | Service worker, when Chrome reports "Specified native messaging host not found." or "Access to the specified native messaging host is forbidden." | Local transcriber not installed. Run install.sh |
+| `host_crashed` | Service worker, for any other native messaging error (including when Chrome cannot start the program) or a reply that is not valid | Transcriber stopped unexpectedly. See host.log |
+| `worker_stopped` | Content script, when the port to the service worker closes or cannot be opened | Transcriber connection lost. Retry |
+| `audio_not_found` | Content script, when capture fails | Could not read this audio. Play it once, then retry |
+| `audio_too_large` | Content script or program, above 40 MiB | Audio is too large to transcribe |
+| `invalid_request` | Program, for a frame or JSON it cannot read, or a `languages` value that is not valid | Internal error (invalid request). See host.log |
+| `model_missing` | Program, when the pinned model is not in the local cache | Model not downloaded. Run install.sh |
+| `decode_failed` | Program, when the audio cannot be decoded | Could not decode this audio |
+| `empty_transcription` | Program, when no speech is found or the text is empty; also the service worker, for an empty text | No speech found in this message |
+| `reply_too_large` | Program, when the reply would exceed 1 MB | Transcript too long to return |
+| `network_block_failed` | Program, when the kernel network block cannot be installed; nothing is transcribed | Could not block network access, so nothing was transcribed. See host.log |
+| `internal_error` | Program, when both attempts fail or something unexpected happens; also the fallback for unknown codes | Transcription failed. See host.log |
+
+Fixes for each are in [Troubleshooting](/local-voice-transcriber/guides/troubleshooting/#messages-under-a-voice-note).

@@ -1,0 +1,118 @@
+---
+title: Install
+description: Install the local program with install.sh and load the extension in Google Chrome, step by step.
+---
+
+import { Aside, Code, Steps } from '@astrojs/starlight/components';
+import RiskNotice from '../../../components/RiskNotice.astro';
+import Src from '../../../components/Src.astro';
+import { CLONE_URL, REPO_NAME } from '../../../consts';
+
+export const EXTENSION_ID = 'aclgfofogdialjfpeplknjloiemchjcf';
+
+export const sampleOutput = `[1/5] Python environment (host/.venv)
+[2/5] Whisper model (about 1.6 GB on the first run, skipped when already downloaded)
+      model folder: ~/.cache/huggingface/hub/models--mobiuslabsgmbh--faster-whisper-large-v3-turbo/snapshots/0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf
+[3/5] Launcher
+[4/5] Host manifest: ~/.config/google-chrome/NativeMessagingHosts/io.github.josesiqueira.local_voice_transcriber.json
+[5/5] Self-check (runs the host once on a short tone, the way Chrome would)
+      reply: {"ok": false, "error": "empty_transcription", "message": "No speech found in this message"}
+      Self-check passed
+
+Done. Extension ID: ${EXTENSION_ID}
+Next: open chrome://extensions, turn on Developer mode, click "Load unpacked"
+and choose: ~/${REPO_NAME}/extension`;
+
+Installing takes two parts: the local program, with one script, and the extension, which you load into Chrome from the repository folder. Check the [requirements](/local-voice-transcriber/start/requirements/) first.
+
+<RiskNotice />
+
+<Steps>
+
+1. Install `uv` if you do not have it. Check with:
+
+    ```sh
+    uv --version
+    ```
+
+    If the command is not found, follow [Astral's installation instructions](https://docs.astral.sh/uv/getting-started/installation/).
+
+2. Get the code. Clone it to a folder you intend to keep: Chrome loads the extension from this folder, and the installer registers the program by its full path.
+
+    <Code lang="sh" code={`git clone ${CLONE_URL}\ncd ${REPO_NAME}`} />
+
+3. Read the installer before you run it. It is about 80 lines of shell.
+
+    ```sh
+    less install.sh
+    ```
+
+    The section [What the installer does](#what-the-installer-does) below lists every action and every file it writes.
+
+4. Run the installer.
+
+    ```sh
+    ./install.sh
+    ```
+
+    The first run downloads the model (about 1.6 GB) and the Python packages (about 2.6 GB once installed), so it can take several minutes. It ends with a self-check that starts the program once, the way Chrome does. The output looks like this (your paths are shown in full):
+
+    <Code lang="txt" title="Output" code={sampleOutput} />
+
+    The self-check sends a short test tone, not speech, so the reply `empty_transcription` is the expected result. It shows that the Python environment, the launcher and the speech check work. It does not load the model and does not go through Chrome; to test the model, run the command in [Troubleshooting](/local-voice-transcriber/guides/troubleshooting/#find-the-details) with a recording of speech.
+
+5. Load the extension in Chrome.
+
+    1. Open `chrome://extensions` in the address bar.
+    2. Turn on **Developer mode** with the switch at the top right.
+    3. Click **Load unpacked**.
+    4. Select the `extension` folder inside the repository folder.
+
+    The extension card shows the ID <code>{EXTENSION_ID}</code>. The ID is fixed by the `key` field in <Src path="extension/manifest.json" />, and it must match the ID the installer wrote into the host manifest.
+
+6. If WhatsApp Web is already open, reload its tab so the extension can add its buttons.
+
+</Steps>
+
+Continue with [First transcription](/local-voice-transcriber/start/first-transcription/) to check that everything works. Detection uses any language by default; to limit it to the languages you receive, use the extension's popup as described in [Choose languages](/local-voice-transcriber/guides/languages/).
+
+<Aside type="note" title="Keep the folder where it is">
+The host manifest points to `host/run-host.sh` by its full path, and Chrome loads the extension from the folder you selected. If you move or rename the repository folder, run `./install.sh` again from the new place and load the extension again from there.
+</Aside>
+
+## What the installer does
+
+<Src path="install.sh" /> can be run more than once; each run brings the install up to date. It stops at the first error.
+
+1. Checks that `uv` exists (on your `PATH` or at `~/.local/bin/uv`) and that Google Chrome is installed at `/usr/bin/google-chrome`.
+2. Creates the Python environment in `host/.venv` with `uv sync`. `uv` installs the exact package versions listed in <Src path="host/uv.lock" />, which also records a hash for every package file. It downloads Python 3.12 first if your system does not have it.
+3. Downloads the Whisper large-v3-turbo model from Hugging Face into `~/.cache/huggingface/hub/`, at the revision pinned in <Src path="host/config.py" />. If the model is already there, nothing is downloaded. Hugging Face and onnxruntime telemetry are turned off for this step and the next ones (`HF_HUB_DISABLE_TELEMETRY=1`, `ORT_DISABLE_TELEMETRY=1`).
+4. Makes `host/run-host.sh` executable.
+5. Writes the native messaging host manifest to `~/.config/google-chrome/NativeMessagingHosts/io.github.josesiqueira.local_voice_transcriber.json`. The manifest names the program to start and the only extension allowed to start it.
+6. Runs the self-check: it sends one request to `host/run-host.sh` the way Chrome does, and fails if the reply is not a valid answer.
+
+It does not use `sudo`, does not change system files, and does not start anything in the background. [Files and paths](/local-voice-transcriber/reference/files/) lists everything that ends up on disk.
+
+The host manifest it writes looks like this, with the full path of your repository folder:
+
+<Code
+	lang="json"
+	title="~/.config/google-chrome/NativeMessagingHosts/io.github.josesiqueira.local_voice_transcriber.json"
+	code={`{
+  "name": "io.github.josesiqueira.local_voice_transcriber",
+  "description": "Local Whisper transcriber for WhatsApp Web voice notes",
+  "path": "/path/to/${REPO_NAME}/host/run-host.sh",
+  "type": "stdio",
+  "allowed_origins": [
+    "chrome-extension://${EXTENSION_ID}/"
+  ]
+}`}
+/>
+
+## Installer options
+
+| Option | Effect |
+| --- | --- |
+| `-h`, `--help` | Print the usage text. |
+
+Any other option stops the installer with "Unknown option". The installer does not set the detection languages; choose them in the extension's popup, as described in [Choose languages](/local-voice-transcriber/guides/languages/).

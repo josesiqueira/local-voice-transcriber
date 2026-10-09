@@ -1,0 +1,12 @@
+---
+// Link to a file in the repository on GitHub, shown as code: <Src path="host/config.py" />.
+import { source } from '../consts';
+
+interface Props {
+	path: string;
+	label?: string;
+}
+const { path, label } = Astro.props;
+---
+
+<a href={source(path)}><code>{label ?? path}</code></a>

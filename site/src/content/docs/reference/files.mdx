@@ -1,0 +1,60 @@
+---
+title: Files and paths
+description: Every file and folder the installer and the program write, how large they are, and what removes them. Also the exact contents of the host log.
+---
+
+import Src from '../../../components/Src.astro';
+
+All paths are inside your home directory or the repository folder, shown here as `<repo>`. Nothing is written outside them and nothing needs `sudo`.
+
+## Written by the installer and the program
+
+| Path | What it is | Size | Removed by |
+| --- | --- | --- | --- |
+| `<repo>/host/.venv/` | Python 3.12 environment: faster-whisper, CTranslate2, PyAV, onnxruntime, the NVIDIA cuBLAS and cuDNN libraries | about 2.6 GB | `./uninstall.sh` |
+| `~/.cache/huggingface/hub/models--mobiuslabsgmbh--faster-whisper-large-v3-turbo/` and the model file it links to in `~/.cache/huggingface/hub/blobs/` | The Whisper large-v3-turbo model at the pinned revision. Recent versions of the Hugging Face library keep the large file in the shared `blobs` folder. | about 1.6 GB | `./uninstall.sh --remove-model` |
+| `~/.config/google-chrome/NativeMessagingHosts/io.github.josesiqueira.local_voice_transcriber.json` | Host manifest: tells Chrome which program to start and which extension may start it | under 1 KB | `./uninstall.sh` |
+| `~/.local/state/local-voice-transcriber/host.log` | The program's log, plus `host.log.1` and `host.log.2` after rotation | at most about 3 MB | `./uninstall.sh` |
+
+Environment variables change some of these locations: `HF_HOME` or `HF_HUB_CACHE` for the model, `WAT_LOG_DIR` for the log folder. See [Configuration](/local-voice-transcriber/reference/configuration/#environment-variables).
+
+## Inside Chrome
+
+| Where | What | Removed by |
+| --- | --- | --- |
+| The extension's `chrome.storage.local`, in your Chrome profile | Cached transcripts, one entry per WhatsApp message ID, under the key `t:<message ID>`. Each entry holds `text`, `language`, `device`, `seconds` and `createdAt`. Not encrypted. Limited to 10 MB. | Removing the extension in `chrome://extensions` |
+| The same storage, key `settings` | The language choice made in the extension's popup, as `{ "languages": [...] }`. See [Configuration](/local-voice-transcriber/reference/configuration/#languages). | Removing the extension in `chrome://extensions` |
+| The extension itself | Nothing is copied: Chrome loads it from `<repo>/extension/` each time it starts. | Removing the extension and deleting the folder |
+
+## Written by other tools
+
+| Path | Written by | Notes |
+| --- | --- | --- |
+| uv's cache, `~/.cache/uv/` by default | `uv` | Downloaded packages, shared by all projects that use `uv`. `uv cache clean` empties it. |
+| uv's Python installs, listed by `uv python list` | `uv` | Only if `uv` had to download Python 3.12. |
+| `~/.cache/Microsoft/DeveloperTools/` | onnxruntime | May hold `deviceid`, a device ID file that other Microsoft developer tools also use, and `.onnxruntime/`, onnxruntime's telemetry event database. `uninstall.sh` deletes `.onnxruntime/` and leaves `deviceid` in place. |
+
+## The host log
+
+The program writes its log to `~/.local/state/local-voice-transcriber/host.log`. When the file reaches 1 MB it is renamed to `host.log.1` (and the previous one to `host.log.2`), so the log never takes more than about 3 MB. The logging setup is `setup_io` in <Src path="host/transcribe_host.py" />.
+
+For a successful request it writes these lines. Values in angle brackets vary. The two `faster_whisper` lines come from the library and hold durations only:
+
+```txt
+<time> <pid> INFO wat.host: start origin=chrome-extension://aclgfofogdialjfpeplknjloiemchjcf/ network_blocked=True
+<time> <pid> INFO wat.host: request bytes=<audio size> mime=<audio type> languages=<codes chosen in the popup, or any>
+<time> <pid> INFO wat.host: decoded seconds_of_audio=<length> in <seconds>s
+<time> <pid> INFO faster_whisper: Processing audio with duration <m:ss.mmm>
+<time> <pid> INFO faster_whisper: VAD filter removed <m:ss.mmm> of audio
+<time> <pid> INFO wat.engine: device=cuda language=en timings={'load': <s>, 'detect': <s>, 'transcribe': <s>} chars=<count>
+<time> <pid> INFO wat.host: reply ok=True error=None seconds=<seconds>
+```
+
+On failures it also writes:
+
+- `error <code>: <message>` for an expected failure, with the same message the reply carries.
+- `network block failed, not transcribing: <error>` when the kernel network block could not be installed. The start line then ends with `network_blocked=False`.
+- `GPU attempt failed, using CPU: <error type>: <error message>` when it falls back to the CPU.
+- A Python traceback when both attempts fail or something unexpected happens.
+
+The program also sends anything the libraries print to the same file, so that nothing but protocol messages reaches Chrome. The program never writes the transcript text or the audio to the log or to any other file. The only copy of the text on disk is the extension's cache in your Chrome profile.

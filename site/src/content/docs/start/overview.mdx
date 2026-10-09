@@ -1,0 +1,50 @@
+---
+title: Overview
+description: What the extension and the local program do, what they do not do, and who they are for.
+---
+
+import { LinkCard, CardGrid } from '@astrojs/starlight/components';
+import RiskNotice from '../../../components/RiskNotice.astro';
+import { PRODUCT_NAME, pageUrl } from '../../../consts';
+
+{PRODUCT_NAME} is a free tool for reading the voice notes in your own WhatsApp account. It works with WhatsApp Web and transcribes one note each time you click.
+
+It adds a small **T** button under each voice note in WhatsApp Web, in Google Chrome on Linux. When you press it, the note is transcribed on your own computer with the Whisper large-v3-turbo speech recognition model, and the text appears under the note with a language tag and a **Copy** link.
+
+It has two parts:
+
+- A Chrome extension that finds voice notes in the page, reads their audio and shows the text.
+- A local program, written in Python, that Chrome starts when you press T. It transcribes the audio with [faster-whisper](https://github.com/SYSTRAN/faster-whisper), replies with the text and exits.
+
+Transcripts are cached in the extension's storage. When you reload WhatsApp Web, the text shows again under each note without running the model.
+
+## What it does
+
+- Transcribes voice notes and audio messages, one at a time, when you press T.
+- Detects the spoken language for each note. You can limit detection to a list of languages in the extension's popup.
+- Runs on an NVIDIA GPU when one is available and on the CPU otherwise.
+- Uses the network only when you install or update it: the code from GitHub, Python packages from PyPI and the model from Hugging Face. A transcription never uses the network.
+
+## What it does not do
+
+- It does not transcribe anything automatically. A note is processed only after you press its T button.
+- It never sends, forwards or automates messages, and it never exports your chat history. It only reads the audio of the note you clicked and shows text under it.
+- It does not send audio or text to any server, its own or anyone else's. There is no account.
+- It does not translate. The text is in the language that was spoken.
+- It does not change WhatsApp's servers or apps, and it does not use WhatsApp's internal code. It adds the T button and the text to the page in your own browser, which means a change to WhatsApp Web can stop it from finding voice notes.
+- It is not available from the Chrome Web Store. You install it from the source code repository.
+
+{PRODUCT_NAME} is an independent open source project and is not affiliated with WhatsApp LLC or Meta Platforms, Inc.
+
+<RiskNotice />
+
+## Who it is for
+
+People who receive voice notes in WhatsApp Web and would rather read them, and who are comfortable running a shell script on Linux. You need Google Chrome from Google's own package, `uv`, and about 4.5 GB of disk space. An NVIDIA GPU makes it faster but is not required.
+
+## Next steps
+
+<CardGrid>
+	<LinkCard title="How it works" description="The path a voice note takes, step by step." href={pageUrl('start/how-it-works/')} />
+	<LinkCard title="Requirements" description="What your computer needs before you install." href={pageUrl('start/requirements/')} />
+</CardGrid>

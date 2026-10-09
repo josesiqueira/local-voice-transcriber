@@ -1,0 +1,17 @@
+/* Neutral colors on purpose: inherit the text color and use translucent grey so the
+   same styles read well in WhatsApp's light and dark themes. */
+.wat-box { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; margin: 2px 64px 6px; max-width: 520px; font-size: 13px; line-height: 1.4; color: inherit; }
+.wat-box.wat-out { align-items: flex-end; margin-left: auto; }
+.wat-row { display: flex; align-items: center; gap: 8px; }
+.wat-btn { font: inherit; font-size: 12px; font-weight: 600; padding: 1px 9px; border-radius: 10px; border: 1px solid rgba(128, 128, 128, 0.45); background: rgba(128, 128, 128, 0.12); color: inherit; cursor: pointer; }
+.wat-btn:disabled { cursor: default; opacity: 0.6; }
+.wat-btn[hidden], .wat-caption[hidden] { display: none; }
+.wat-status { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; opacity: 0.85; }
+.wat-error { color: #d93025; }
+.wat-spinner { width: 10px; height: 10px; border: 2px solid rgba(128, 128, 128, 0.4); border-top-color: currentColor; border-radius: 50%; animation: wat-spin 0.8s linear infinite; }
+@keyframes wat-spin { to { transform: rotate(360deg); } }
+.wat-caption { background: rgba(128, 128, 128, 0.14); border-radius: 8px; padding: 6px 10px; max-width: 100%; box-sizing: border-box; }
+.wat-text { white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; cursor: text; }
+.wat-meta { display: flex; align-items: center; gap: 10px; margin-top: 4px; font-size: 11px; opacity: 0.8; }
+.wat-lang { font-weight: 700; letter-spacing: 0.04em; }
+.wat-copy { font: inherit; background: none; border: none; padding: 0; color: inherit; text-decoration: underline; cursor: pointer; }

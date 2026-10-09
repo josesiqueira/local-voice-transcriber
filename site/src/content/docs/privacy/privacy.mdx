@@ -1,0 +1,83 @@
+---
+title: Privacy
+description: What happens to a voice note, what leaves your computer and when, the permissions the extension requests, and where data is stored and for how long.
+---
+
+import Src from '../../../components/Src.astro';
+
+## In short
+
+Voice notes are transcribed by a program on your own computer. During a transcription nothing is sent over the network, and the project collects no usage data. The network is used only when you install or update, to download the code, the Python packages and the speech model. Transcripts are stored unencrypted in your Chrome profile until you remove the extension.
+
+## What happens to a voice note
+
+1. You press T under a voice note in WhatsApp Web.
+2. The extension gets the note's audio from the page, usually by pressing the note's own play button with the sound muted. This is the audio WhatsApp Web downloads to play the note to you.
+3. The extension passes the audio to the local program through Chrome native messaging. Chrome starts the program as a separate process and writes the audio to its standard input. No network port is opened.
+4. The program decodes the audio in memory and transcribes it with Whisper large-v3-turbo on your GPU or CPU. It writes the text to its standard output and exits. It does not save the audio or the text to disk.
+5. The extension shows the text under the note and saves it in the extension's storage in your Chrome profile.
+
+## What leaves your computer
+
+During a transcription: nothing. This is enforced in layers: the extension has no way to reach the network, the libraries in the local program are told not to connect, and the Linux kernel refuses the local program if anything in it tries anyway.
+
+| Part | How it is kept offline | Where to check |
+| --- | --- | --- |
+| Extension | It requests no host permissions and contains no network calls. Its only `fetch` reads a `blob:` URL, which is data already in the page's memory. The popup where you choose languages makes no network requests either: it reads and writes the extension's local storage only. | <Src path="extension/manifest.json" />, <Src path="extension/page-hook.js" /> |
+| Local program, library settings | The launcher sets `HF_HUB_OFFLINE=1`, so the Hugging Face library never connects, and the model is opened with `local_files_only=True`. It also sets `ORT_DISABLE_TELEMETRY=1`, which turns off the usage telemetry built into onnxruntime. | <Src path="host/run-host.sh" />, <Src path="host/engine.py" /> |
+| Local program, kernel block | The strongest layer. When the program starts, before it imports faster-whisper, CTranslate2 or onnxruntime and before it reads the audio, it installs a seccomp filter, the Linux kernel feature behind systemd's `RestrictAddressFamilies=` setting. From then on the kernel refuses every `socket()` call with "Permission denied" (`EACCES`), except for local Unix sockets, which the NVIDIA driver uses, and netlink sockets, which query the kernel and never leave the computer. It also refuses io_uring, which can create sockets without calling `socket()`. The filter covers every thread, including those started by native libraries, is inherited by any child process, and cannot be removed by the program. It needs no root rights. If it cannot be installed, the program transcribes nothing and replies with `network_block_failed`. | <Src path="host/netblock.py" />, <Src path="host/transcribe_host.py" /> |
+
+These downloads happen only when you install or update:
+
+| What | From | When |
+| --- | --- | --- |
+| The source code | GitHub, with `git clone` | When you get the code, and on each `git pull` |
+| Python packages (faster-whisper, CTranslate2, PyAV, onnxruntime, NVIDIA CUDA libraries and their dependencies) | PyPI, through `uv sync` | `./install.sh`, when packages are missing or changed |
+| Python 3.12, if your system does not have it | Astral's python-build-standalone builds, through `uv` | `./install.sh`, first run only |
+| The model `mobiuslabsgmbh/faster-whisper-large-v3-turbo` at a pinned revision, about 1.6 GB | Hugging Face (huggingface.co and its file storage) | `./install.sh`, when the model is missing |
+
+The installer turns off Hugging Face and onnxruntime telemetry for the download and the self-check (`HF_HUB_DISABLE_TELEMETRY=1`, `ORT_DISABLE_TELEMETRY=1`).
+
+There is no analytics, no crash reporting and no update check in the extension or the program. There is no account and no server run by this project.
+
+One dependency has telemetry built in. onnxruntime, the library that runs the speech filter, contains Microsoft's usage telemetry client. Without `ORT_DISABLE_TELEMETRY=1`, a transcription traced with `strace` looked up `mobile.events.data.microsoft.com` and connected to it. The launcher and the installer set the variable, and with it the same trace showed no internet connection. The kernel block is the layer under these settings: if a library tried to connect anyway, the kernel would refuse the socket. This was tested by tracing real transcriptions, not by reviewing every code path in onnxruntime. [Check 7](/local-voice-transcriber/privacy/verify/#7-trace-the-programs-network-system-calls) repeats the test on your computer.
+
+WhatsApp Web itself keeps using the network as usual. The extension does not change what WhatsApp sends or receives.
+
+## Permissions
+
+The extension's <Src path="extension/manifest.json" /> requests two permissions and runs content scripts on one site.
+
+| Permission | Why the extension needs it | What Chrome shows |
+| --- | --- | --- |
+| `nativeMessaging` | Start the local program and exchange one message with it | Communicate with cooperating native applications |
+| `storage` | Cache transcripts and keep the language choice made in the popup, in your Chrome profile | No warning |
+| Content scripts on `https://web.whatsapp.com/*` | Add the T button, read the voice note audio, show the text | Site access for web.whatsapp.com |
+
+The popup that opens from the extension's toolbar icon (the manifest's `action`) needs no extra permission. It does not request `host_permissions`, `tabs`, `webRequest`, `cookies`, `history`, `downloads`, `clipboardRead` or `<all_urls>`. The Copy link writes to the clipboard with the standard `navigator.clipboard.writeText` call after you click it; reading the clipboard is never needed.
+
+Chrome starts the local program only for the extension ID listed in the host manifest that the installer writes (`allowed_origins`). Other extensions cannot use it.
+
+## Where data is stored
+
+| Data | Where | How long |
+| --- | --- | --- |
+| Transcripts: text, language code, device (`cuda` or `cpu`), seconds taken, time created | The extension's storage (`chrome.storage.local`) in your Chrome profile, one entry per WhatsApp message ID. Not encrypted. | Until you remove the extension. There is no automatic expiry. |
+| Audio | Memory only. The page keeps references to up to 20 recent voice note audio objects that WhatsApp Web created, so the extension can read them. The local program holds the audio in memory while it runs. | Until the tab is reloaded or closed, and until the program exits |
+| Language setting: the language codes chosen in the extension's popup, if any | The extension's storage (`chrome.storage.local`) in your Chrome profile, under the key `settings` | Until you change it or remove the extension |
+| Host log: timings, device, language, the languages chosen in the popup, character counts, audio size and format, error messages | `~/.local/state/local-voice-transcriber/host.log`, rotated at 1 MB with two older files kept | Until it is rotated out or you uninstall |
+
+Chrome limits `chrome.storage.local` to 10 MB for this extension. If the storage is full, new transcripts are still shown but not cached.
+
+The log never contains the transcript text or the audio. You can read it: `cat ~/.local/state/local-voice-transcriber/host.log`. [Files and paths](/local-voice-transcriber/reference/files/#the-host-log) shows the exact lines it writes.
+
+To delete the cached transcripts, remove the extension in `chrome://extensions`. [Uninstall](/local-voice-transcriber/guides/uninstall/) removes everything else.
+
+## This website
+
+This site has no analytics and no cookies, and it loads nothing from other servers: the font and the search index are served from the same place as the pages. It keeps two small items in your browser: `starlight-theme` in local storage, when you pick light or dark mode, and `sl-sidebar-state` in session storage, which remembers how the sidebar is scrolled and folded while the tab is open.
+
+## Related
+
+- [Verify it yourself](/local-voice-transcriber/privacy/verify/): checks with expected results.
+- [Limits](/local-voice-transcriber/privacy/limits/): what this design does not protect against, and the risk under WhatsApp's terms of service.

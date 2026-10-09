@@ -1,0 +1,50 @@
+---
+// Starlight's own footer (edit link, previous and next page), followed by the project notice
+// that every page carries.
+import Default from '@astrojs/starlight/components/Footer.astro';
+import { REPO_URL, TRADEMARK_NOTICE, pageUrl } from '../consts';
+---
+
+<Default />
+
+<div class="site-footer">
+	<nav aria-label="Project links">
+		<a href={pageUrl('privacy/privacy/')}>Privacy</a>
+		<a href={pageUrl('privacy/security-issues/')}>Security</a>
+		<a href={pageUrl('reference/license/')}>License: AGPL-3.0</a>
+		<a href={REPO_URL}>Source code</a>
+	</nav>
+	<p>{TRADEMARK_NOTICE}</p>
+	<p>This site has no analytics, no cookies and loads nothing from other servers.</p>
+</div>
+
+<style>
+	.site-footer {
+		margin-top: 2rem;
+		padding-top: 1.5rem;
+		border-top: 1px solid var(--sl-color-hairline-light);
+		font-size: var(--sl-text-xs);
+		line-height: 1.6;
+		color: var(--sl-color-gray-3);
+	}
+	nav {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.5rem 1.5rem;
+		margin-bottom: 1rem;
+		font-size: var(--sl-text-sm);
+	}
+	nav a {
+		color: var(--sl-color-gray-2);
+		text-decoration: none;
+	}
+	nav a:hover {
+		color: var(--sl-color-white);
+		text-decoration: underline;
+		text-underline-offset: 0.2em;
+	}
+	p {
+		margin: 0 0 0.5rem;
+		max-width: 70ch;
+	}
+</style>

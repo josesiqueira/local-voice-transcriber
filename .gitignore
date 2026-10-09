@@ -1,0 +1,13 @@
+_queries.cypher
+host/.venv/
+tests/audio/
+__pycache__/
+node_modules/
+test-results/
+playwright-report/
+*.pem
+
+# Docs site build output
+site/node_modules/
+site/dist/
+site/.astro/

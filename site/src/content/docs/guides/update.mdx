@@ -1,0 +1,39 @@
+---
+title: Update
+description: Get a new version with git pull, re-run the installer, then reload the extension and the WhatsApp Web tab.
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+import { REPO_URL } from '../../../consts';
+
+The extension is loaded from a folder, so it does not update itself. Chrome only updates extensions installed from the Chrome Web Store. To be told about new versions, watch the repository's releases on GitHub (<a href={REPO_URL}>repository page</a>, **Watch**, **Custom**, **Releases**).
+
+<Steps>
+
+1. In the repository folder, get the new version:
+
+    ```sh
+    git pull
+    ```
+
+2. Run the installer again. It updates the Python environment to the versions in the lock file, downloads a new model only if the pinned revision changed, rewrites the host manifest and runs the self-check.
+
+    ```sh
+    ./install.sh
+    ```
+
+3. Open `chrome://extensions` and click the reload icon on the extension's card.
+
+4. Reload every open WhatsApp Web tab.
+
+</Steps>
+
+<Aside type="caution" title="Reload the WhatsApp Web tab after reloading the extension">
+After the extension is reloaded, the content script that is still running in an open WhatsApp Web tab can no longer reach the extension's service worker. Any T button in that tab then fails with "Transcriber connection lost. Retry". Reloading the tab fixes it.
+</Aside>
+
+Reloading the extension keeps its storage, so your cached transcripts and the language choice in its popup stay as they were.
+
+## Check the update
+
+Open `chrome://extensions` and compare the version on the extension's card with the version in `extension/manifest.json`. Then transcribe a voice note as in [First transcription](/local-voice-transcriber/start/first-transcription/).

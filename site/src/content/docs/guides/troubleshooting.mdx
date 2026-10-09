@@ -1,0 +1,168 @@
+---
+title: Troubleshooting
+description: Every message the extension can show, with its cause and fix, plus missing buttons, CPU fallback, the host log and Chrome's native messaging logs.
+tableOfContents:
+  maxHeadingLevel: 3
+---
+
+import { Aside } from '@astrojs/starlight/components';
+import Src from '../../../components/Src.astro';
+import { REPO_URL } from '../../../consts';
+
+Start with the message under the voice note. Each one below is the exact text the extension shows, defined in <Src path="extension/ui.js" />. The code in parentheses is the error code you will find in the host log and in [Architecture](/local-voice-transcriber/reference/architecture/#error-codes).
+
+## Find the details
+
+Two logs help with most problems.
+
+The local program writes one log file. Read the last lines right after a failure:
+
+```sh
+tail -n 30 ~/.local/state/local-voice-transcriber/host.log
+```
+
+The log holds timings, the device, the language, character counts and error messages, never the transcript text. See [Files and paths](/local-voice-transcriber/reference/files/#the-host-log).
+
+Chrome can log what happens when it tries to start the program. Close every Chrome window first, then start Chrome from a terminal with logging on, as described in Chrome's [native messaging documentation](https://developer.chrome.com/docs/extensions/develop/concepts/native-messaging):
+
+```sh
+google-chrome --enable-logging=stderr --log-level=1 2>&1 | grep -E "native_messag|launch_context"
+```
+
+You can also run the program the way Chrome does, outside Chrome, from the repository folder. This is the same self-check the installer runs:
+
+```sh
+host/.venv/bin/python host/native_client.py host/run-host.sh tests/mock-audio.ogg
+```
+
+The expected reply is `{"ok": false, "error": "empty_transcription", "message": "No speech found in this message"}`, because the test file is a tone, not speech. To test the full path including the model, pass a recording of speech instead of `tests/mock-audio.ogg`.
+
+## Messages under a voice note
+
+### Local transcriber not installed. Run install.sh
+
+Code: `host_not_installed`. Chrome could not find the program, or the program does not allow this extension. Chrome reported "Specified native messaging host not found." or "Access to the specified native messaging host is forbidden."
+
+- Run `./install.sh` and check that it ends with "Self-check passed".
+- Check that the host manifest exists: `ls ~/.config/google-chrome/NativeMessagingHosts/io.github.josesiqueira.local_voice_transcriber.json`.
+- If you moved or renamed the repository folder, run `./install.sh` again from its new place, because the manifest holds the full path of `host/run-host.sh`.
+- Compare the ID on the extension's card in `chrome://extensions` with the ID in the manifest's `allowed_origins`. They must be the same.
+- Flatpak and Snap builds of Chrome look for manifests elsewhere and cannot start the program. Use Google Chrome from Google's .deb or .rpm package.
+
+### Transcriber stopped unexpectedly. See host.log
+
+Code: `host_crashed`. Chrome could not start the program, or did not get a valid reply from it. Chrome reported another native messaging error, such as "Native host has exited.", "Failed to start native messaging host." or "Error when communicating with the native messaging host."
+
+- Read the last lines of the host log (see [Find the details](#find-the-details)).
+- Run the self-check command above. If it fails outside Chrome too, run `./install.sh` again.
+- Check that `host/run-host.sh` is executable: `ls -l host/run-host.sh`. The installer sets this.
+- Very long notes, especially in CPU mode, may fail. Chrome's documentation says it can stop an extension's service worker when a single event or API call takes longer than 5 minutes. It does not say whether this applies to `sendNativeMessage`, and the extension sets no time limit of its own. Such a failure more likely shows "Transcriber connection lost. Retry".
+
+### Transcriber connection lost. Retry
+
+Code: `worker_stopped`. The content script in the WhatsApp Web tab lost its connection to the extension's service worker.
+
+- If you reloaded, updated or turned the extension off and on in `chrome://extensions`, reload the WhatsApp Web tab. The content script that was running before cannot reach the new service worker.
+- Very long notes, especially in CPU mode, may fail this way. Chrome's documentation says it can stop an extension's service worker when a single event or API call takes longer than 5 minutes; it does not say whether this applies to `sendNativeMessage`.
+- Otherwise press **Retry**.
+
+### Could not read this audio. Play it once, then retry
+
+Code: `audio_not_found`. The extension did not get the note's audio within 20 seconds, the note is no longer in the page, or the note has no play button the extension recognizes.
+
+- If the note was playing when you pressed T, pause it and press **Retry**. The extension captures the audio when playback starts, so a note that is already playing gives it nothing to capture.
+- Play the note once with WhatsApp's own play button, so WhatsApp Web loads the audio, then press **Retry**.
+- If this happens on every note, WhatsApp Web may have changed its page. See [No T button under voice notes](#no-t-button-under-voice-notes) for how to collect details for a bug report.
+
+### Audio is too large to transcribe
+
+Code: `audio_too_large`. The audio is larger than 40 MiB, the limit set by `MAX_AUDIO_BYTES` in <Src path="host/config.py" /> and <Src path="extension/content.js" />. The limit keeps the request below Chrome's 64 MiB limit for one message to a native program after the audio is encoded as base64. Typical voice notes are far smaller.
+
+### Internal error (invalid request). See host.log
+
+Code: `invalid_request`. The program received a request it could not read. This points to a bug. Please <a href={`${REPO_URL}/issues`}>open an issue</a> with the matching lines from the host log; see the note at the end of this page.
+
+### Model not downloaded. Run install.sh
+
+Code: `model_missing`. The program did not find the pinned model version in the local Hugging Face cache. It never downloads the model by itself.
+
+- Run `./install.sh`. It downloads the model if it is missing.
+- If you set `HF_HOME` or `HF_HUB_CACHE` in your shell, Chrome may not see the same value, so the program looks in a different folder than the installer used. Chrome passes its own environment to the program. Either start Chrome with the same variables or install without them.
+
+### Could not decode this audio
+
+Code: `decode_failed`. The program could not decode the bytes it received as audio.
+
+- Play the note once with WhatsApp's own play button, then press **Retry**.
+- If it keeps failing for one note, the captured data may not be the note's audio. Please report it.
+
+### No speech found in this message
+
+Code: `empty_transcription`. The speech detection filter found no speech in the audio, or the model returned no text. This is the expected result for silence, music or noise.
+
+### Transcript too long to return
+
+Code: `reply_too_large`. The reply would exceed Chrome's limit of 1 MB for one message from a native program. With the 40 MiB audio limit, this is not expected for real voice notes.
+
+### Could not block network access, so nothing was transcribed. See host.log
+
+Code: `network_block_failed`. Before it reads the audio, the program asks the Linux kernel to refuse it every network socket, with a seccomp filter (see [How the program stays offline](/local-voice-transcriber/start/how-it-works/#how-the-program-stays-offline)). The kernel refused the filter, so the program stopped without transcribing. Possible causes are a kernel built without seccomp support or a system that is not x86_64.
+
+- Read the host log. The line "network block failed, not transcribing:" gives the error from the kernel, and the start line ends with `network_blocked=False`.
+- Check the platform: `uname -m` should print `x86_64`. This tool supports Linux on x86_64 only; see [Platform support](/local-voice-transcriber/reference/platform-support/).
+
+### Transcription failed. See host.log
+
+Code: `internal_error`. Both the GPU attempt and the CPU attempt failed, or something unexpected happened. Any error code the extension does not know also shows this message.
+
+- Read the host log. It records why the GPU attempt failed and the full error of the CPU attempt.
+- Run `./install.sh` again. It repairs the Python environment and runs the self-check.
+
+## Other problems
+
+### No T button under voice notes
+
+- Check that the extension is turned on in `chrome://extensions` and shows no errors.
+- Reload the WhatsApp Web tab. The extension adds buttons only in tabs loaded after it was installed or reloaded.
+- The button appears only under voice notes and audio messages, not under videos or other files.
+
+If it is still missing, WhatsApp Web has probably changed the structure of its page. All page lookups are in <Src path="extension/selectors.js" />. The repository has two diagnostic scripts you can paste into the DevTools console on `web.whatsapp.com` (Chrome asks you to type "allow pasting" the first time):
+
+- <Src path="docs/structure-probe.js" /> prints the structure of voice note messages: element names and stable attributes, with IDs and phone numbers replaced.
+- <Src path="docs/capture-probe.js" /> records which browser audio functions WhatsApp Web calls when a note plays: function names, object types, byte counts, URL schemes and hosts, no audio, text or full URLs.
+
+Read the output before you share it in an issue.
+
+### Runs on the CPU instead of the GPU
+
+The tooltip on the language tag shows `cpu`, and transcription is slow. The host log has a line that starts with "GPU attempt failed, using CPU:" followed by the error.
+
+- Check that the NVIDIA driver works: `nvidia-smi` should list your GPU.
+- The driver must support CUDA 12. Update the driver if the log mentions a CUDA version or driver mismatch.
+- If the error is about memory, other programs may be using the GPU memory. Close them or try again later.
+
+### The text is wrong or reads like a translation
+
+The language tag shows a language the note is not in. If you limited detection in the extension's popup, Whisper is forced to use one of the checked languages, even for a note in another language. Open the popup, add the note's language to the list or select **Any language**, then transcribe a new note. A note that is already transcribed keeps its text. See [Choose languages](/local-voice-transcriber/guides/languages/).
+
+With **Any language**, a short or unclear note can still be detected as a related language. Limiting detection to the languages you receive helps in that case.
+
+### The extension icon is not in the toolbar
+
+Chrome does not pin an unpacked extension to the toolbar. Click the puzzle piece button at the right of the address bar to find **Local Voice Transcriber**, and click the pin button next to it to keep the icon in the toolbar.
+
+### The first transcription is slow
+
+The first transcription after a reboot reads the model, about 1.6 GB, from disk. Later ones are faster because the operating system keeps the files in its cache. Each click also starts a fresh program and loads the model, by design; see [How it works](/local-voice-transcriber/start/how-it-works/#why-the-program-exits-after-every-request).
+
+### A voice note plays out loud
+
+If WhatsApp Web plays a note through the Web Audio interface instead of an audio element, the muted capture described in [How it works](/local-voice-transcriber/start/how-it-works/) cannot mute or pause it, and you may hear the note. Pause it with WhatsApp's own button. The transcription still works.
+
+### The sender may see the note as played
+
+To capture a note, the extension usually presses the note's own play button, and WhatsApp may record the note as played. This has not been verified. To avoid it for a note, do not press T on notes you have not played.
+
+<Aside type="note" title="Reporting a bug">
+Open an issue on <a href={`${REPO_URL}/issues`}>GitHub</a> with the message you saw, the relevant lines from `host.log`, your Chrome version and whether you use the GPU or the CPU. Check the log lines first: they contain no transcript text, but error messages can include file paths from your computer. For security problems, use [private reporting](/local-voice-transcriber/privacy/security-issues/) instead.
+</Aside>

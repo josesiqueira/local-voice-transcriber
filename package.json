@@ -1,0 +1,14 @@
+{
+  "name": "local-voice-transcriber",
+  "version": "1.0.0",
+  "description": "Test tooling for Local Voice Transcriber",
+  "scripts": {
+    "test": "playwright test",
+    "test:slow": "WAT_SLOW=1 playwright test --grep @slow"
+  },
+  "license": "AGPL-3.0-only",
+  "devDependencies": {
+    "@playwright/test": "^1.64.0"
+  },
+  "private": true
+}

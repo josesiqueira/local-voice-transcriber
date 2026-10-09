@@ -1,0 +1,28 @@
+---
+title: Platform support
+description: Which operating systems, browsers and GPUs are supported, and what support for the others would take.
+---
+
+import { Badge } from '@astrojs/starlight/components';
+import { REPO_URL } from '../../../consts';
+
+| Platform | Status | Notes |
+| --- | --- | --- |
+| Linux on x86_64 | <Badge text="Supported" variant="success" /> | With Google Chrome from Google's .deb or .rpm package. |
+| Google Chrome as a Flatpak or Snap | <Badge text="Not supported" variant="caution" /> | Sandboxed browsers read host manifests from other folders and by default cannot start programs outside the sandbox. |
+| Chromium and other Chromium-based browsers | <Badge text="Not supported" variant="caution" /> | They read host manifests from their own folders, and the installer only registers the program for Google Chrome. |
+| macOS | <Badge text="Not yet" variant="note" /> | Needs its own install script. It would run on the CPU only, because faster-whisper's GPU support needs CUDA. |
+| Windows | <Badge text="Not yet" variant="note" /> | Chrome finds native programs on Windows through the registry, so it needs its own installer. |
+| Firefox | <Badge text="Not supported" variant="caution" /> | Firefox uses a different extension format and a different native messaging setup. |
+
+## GPUs
+
+| Hardware | Status |
+| --- | --- |
+| NVIDIA GPU with a driver that supports CUDA 12 | Used for transcription |
+| AMD or Intel GPU | Not used; transcription runs on the CPU |
+| No GPU | Transcription runs on the CPU, several times slower than on a GPU |
+
+## Contributing support for another platform
+
+Support for macOS, Windows or another browser is welcome. The extension and the program are mostly portable; the platform-specific parts are the install script, the location of the host manifest, the kernel network block in `host/netblock.py` (written for Linux on x86_64) and, on Windows, the registry entry. Open an issue on <a href={`${REPO_URL}/issues`}>GitHub</a> before you start, so the approach can be agreed first.

@@ -1,0 +1,49 @@
+---
+title: First transcription
+description: Transcribe a voice note for the first time and check that the GPU, the cache and the language tag work as expected.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import VoiceNote from '../../../components/VoiceNote.astro';
+
+This page walks through one transcription and the checks that tell you the install is complete.
+
+<figure class="lt-figure" style="max-width: 26rem">
+	<VoiceNote />
+	<figcaption>A voice note with the T button, and a transcribed note with its language tag and Copy link. Illustration.</figcaption>
+</figure>
+
+## Transcribe a voice note
+
+<Steps>
+
+1. Open [WhatsApp Web](https://web.whatsapp.com/) in Google Chrome. If it was already open when you loaded the extension, reload the tab.
+
+2. Open a chat with a voice note. A small **T** button appears under each voice note and audio message.
+
+3. Press **T**. The button is disabled and **Transcribing...** appears next to it.
+
+    To capture the audio, the extension usually presses the note's own play button with the sound muted, then pauses and rewinds the note. You may see the play button change for a moment.
+
+4. When the text is ready, the button disappears and a caption shows under the note: the transcript, a language tag such as **EN**, and a **Copy** link. **Copy** puts the text on your clipboard.
+
+</Steps>
+
+## Check where it ran
+
+Hold the pointer over the language tag. A tooltip shows the device and the number of seconds the local program took, in the form `cuda, N s`.
+
+- `cuda` means the GPU was used.
+- `cpu` means the GPU attempt failed and the CPU was used. If you expected the GPU, see [Runs on the CPU](/local-voice-transcriber/guides/troubleshooting/#runs-on-the-cpu-instead-of-the-gpu).
+
+The time includes starting the program and loading the model. The first transcription after a reboot takes longer than the ones after it, because the model is read from disk.
+
+## Check the cache
+
+Reload the WhatsApp Web tab and open the same chat. The caption shows again under the note without the T button and without running the model. The text comes from the extension's storage on your computer. See [Privacy](/local-voice-transcriber/privacy/privacy/#where-data-is-stored) for what is stored and for how long.
+
+## If something goes wrong
+
+When a transcription fails, a short message replaces **Transcribing...** and the button changes to **Retry**. Each message is listed with its cause and fix in [Troubleshooting](/local-voice-transcriber/guides/troubleshooting/).
+
+Next, you may want to [limit detection to your languages](/local-voice-transcriber/guides/languages/) in the extension's popup, or [verify the privacy claims yourself](/local-voice-transcriber/privacy/verify/).

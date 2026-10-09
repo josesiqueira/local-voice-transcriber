@@ -1,0 +1,317 @@
+---
+// Data-flow diagram: WhatsApp Web tab, extension, Chrome native messaging, local program, and
+// the text coming back. A wide layout for wide columns and a tall one for narrow columns;
+// a container query shows one.
+// Every label matches the code: extension/background.js, host/run-host.sh, host/engine.py.
+interface Props {
+	caption?: boolean;
+}
+const { caption = true } = Astro.props;
+const desc =
+	'Inside your computer, Google Chrome holds the WhatsApp Web tab and the extension. The content script gets the voice note audio from the page, usually by playing the note with the sound muted, and hands it to the extension service worker. The service worker sends it through Chrome native messaging, over standard input and output with no network port, to the local program. Chrome starts the local program for this one request; it transcribes with faster-whisper and Whisper large-v3-turbo on the GPU, or the CPU, replies with the text and language, and exits. The text goes back the same way and appears under the voice note. The line to the internet is crossed out: nothing is sent over the network during a transcription.';
+---
+
+<figure class="lt-figure dataflow">
+	<svg class="wide" viewBox="0 0 1000 430" role="img" aria-labelledby="df-w-title df-w-desc" xmlns="http://www.w3.org/2000/svg">
+		<title id="df-w-title">How a voice note is transcribed</title>
+		<desc id="df-w-desc">{desc}</desc>
+		<defs>
+			<marker id="df-w-fwd" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+				<path class="head-fwd" d="M0 0 L10 5 L0 10 Z"></path>
+			</marker>
+			<marker id="df-w-ret" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+				<path class="head-ret" d="M0 0 L10 5 L0 10 Z"></path>
+			</marker>
+		</defs>
+
+		<rect class="computer" x="8" y="8" width="984" height="318" rx="18"></rect>
+		<text class="zone-label" x="30" y="38">Your computer</text>
+
+		<rect class="chrome" x="26" y="56" width="542" height="250" rx="14"></rect>
+		<text class="zone-sub" x="46" y="82">Google Chrome</text>
+
+		<rect class="box" x="46" y="98" width="152" height="188" rx="10"></rect>
+		<text class="box-title" x="60" y="126">WhatsApp Web tab</text>
+		<text class="box-sub" x="60" y="148">web.whatsapp.com</text>
+		<text class="box-sub" x="60" y="172">Voice note audio</text>
+		<text class="box-sub" x="60" y="190">loaded when</text>
+		<text class="box-sub" x="60" y="208">the note plays</text>
+
+		<rect class="box ext" x="222" y="98" width="152" height="188" rx="10"></rect>
+		<text class="box-title" x="236" y="126">Content script</text>
+		<text class="box-sub" x="236" y="148">Adds the T button</text>
+		<text class="box-sub" x="236" y="166">Reads the audio</text>
+		<text class="box-sub" x="236" y="184">Shows the text</text>
+		<text class="tag" x="236" y="270">Extension</text>
+
+		<rect class="box ext" x="398" y="98" width="152" height="188" rx="10"></rect>
+		<text class="box-title" x="412" y="126">Service worker</text>
+		<text class="box-sub mono" x="412" y="148">sendNativeMessage</text>
+		<text class="box-sub" x="412" y="166">One request</text>
+		<text class="box-sub" x="412" y="184">at a time</text>
+		<text class="tag" x="412" y="270">Extension</text>
+
+		<rect class="box host" x="732" y="56" width="244" height="250" rx="14"></rect>
+		<text class="box-title" x="752" y="86">Local program</text>
+		<text class="box-sub" x="752" y="110">Started by Chrome for one</text>
+		<text class="box-sub" x="752" y="128">request, exits after the reply</text>
+		<text class="box-sub strong" x="752" y="160">faster-whisper</text>
+		<text class="box-sub" x="752" y="180">Whisper large-v3-turbo</text>
+		<text class="box-sub" x="752" y="198">model read from disk</text>
+		<rect class="chip" x="752" y="222" width="72" height="26" rx="6"></rect>
+		<text class="chip-text" x="788" y="240" text-anchor="middle">GPU</text>
+		<text class="box-sub" x="836" y="240">or</text>
+		<rect class="chip" x="860" y="222" width="72" height="26" rx="6"></rect>
+		<text class="chip-text" x="896" y="240" text-anchor="middle">CPU</text>
+		<text class="box-sub small" x="752" y="282">CUDA first, CPU on any GPU error</text>
+
+		<line class="fwd" x1="198" y1="226" x2="218" y2="226" marker-end="url(#df-w-fwd)"></line>
+		<line class="fwd" x1="374" y1="226" x2="394" y2="226" marker-end="url(#df-w-fwd)"></line>
+		<line class="fwd" x1="550" y1="150" x2="728" y2="150" marker-end="url(#df-w-fwd)"></line>
+		<text class="flow-label" x="650" y="140" text-anchor="middle">audio</text>
+
+		<line class="ret" x1="732" y1="250" x2="554" y2="250" marker-end="url(#df-w-ret)"></line>
+		<text class="flow-label accent" x="650" y="272" text-anchor="middle">text, language</text>
+		<line class="ret" x1="398" y1="250" x2="378" y2="250" marker-end="url(#df-w-ret)"></line>
+		<line class="ret" x1="222" y1="250" x2="202" y2="250" marker-end="url(#df-w-ret)"></line>
+
+		<text class="pipe-label" x="650" y="188" text-anchor="middle">native messaging</text>
+		<text class="pipe-label sub" x="650" y="205" text-anchor="middle">stdin and stdout,</text>
+		<text class="pipe-label sub" x="650" y="222" text-anchor="middle">no network port</text>
+
+		<line class="net-line" x1="500" y1="326" x2="500" y2="378"></line>
+		<g class="cross">
+			<line x1="489" y1="341" x2="511" y2="363"></line>
+			<line x1="511" y1="341" x2="489" y2="363"></line>
+		</g>
+		<rect class="net" x="420" y="378" width="160" height="42" rx="21"></rect>
+		<text class="net-text" x="500" y="404" text-anchor="middle">Internet</text>
+		<text class="net-note" x="526" y="357">Not used when you transcribe</text>
+	</svg>
+
+	<svg class="tall" viewBox="0 0 360 800" role="img" aria-labelledby="df-t-title df-t-desc" xmlns="http://www.w3.org/2000/svg">
+		<title id="df-t-title">How a voice note is transcribed</title>
+		<desc id="df-t-desc">{desc}</desc>
+		<defs>
+			<marker id="df-t-fwd" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+				<path class="head-fwd" d="M0 0 L10 5 L0 10 Z"></path>
+			</marker>
+			<marker id="df-t-ret" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+				<path class="head-ret" d="M0 0 L10 5 L0 10 Z"></path>
+			</marker>
+		</defs>
+
+		<rect class="computer" x="6" y="6" width="348" height="680" rx="16"></rect>
+		<text class="zone-label" x="24" y="34">Your computer</text>
+
+		<rect class="chrome" x="20" y="48" width="320" height="378" rx="12"></rect>
+		<text class="zone-sub" x="36" y="72">Google Chrome</text>
+
+		<rect class="box" x="36" y="86" width="246" height="92" rx="10"></rect>
+		<text class="box-title" x="52" y="112">WhatsApp Web tab</text>
+		<text class="box-sub" x="52" y="134">Voice note audio, loaded</text>
+		<text class="box-sub" x="52" y="154">when the note plays</text>
+
+		<rect class="box ext" x="36" y="202" width="246" height="92" rx="10"></rect>
+		<text class="box-title" x="52" y="228">Content script</text>
+		<text class="box-sub" x="52" y="250">Adds the T button, reads the</text>
+		<text class="box-sub" x="52" y="270">audio, shows the text</text>
+
+		<rect class="box ext" x="36" y="318" width="246" height="92" rx="10"></rect>
+		<text class="box-title" x="52" y="344">Service worker</text>
+		<text class="box-sub mono" x="52" y="366">sendNativeMessage</text>
+		<text class="box-sub" x="52" y="386">One request at a time</text>
+
+		<rect class="box host" x="20" y="500" width="320" height="170" rx="12"></rect>
+		<text class="box-title" x="36" y="528">Local program</text>
+		<text class="box-sub" x="36" y="550">Started by Chrome for one request,</text>
+		<text class="box-sub" x="36" y="570">exits after the reply</text>
+		<text class="box-sub strong" x="36" y="598">faster-whisper</text>
+		<text class="box-sub" x="36" y="618">Whisper large-v3-turbo</text>
+		<rect class="chip" x="36" y="632" width="64" height="26" rx="6"></rect>
+		<text class="chip-text" x="68" y="650" text-anchor="middle">GPU</text>
+		<text class="box-sub" x="110" y="650">or</text>
+		<rect class="chip" x="132" y="632" width="64" height="26" rx="6"></rect>
+		<text class="chip-text" x="164" y="650" text-anchor="middle">CPU</text>
+
+		<line class="fwd" x1="130" y1="178" x2="130" y2="198" marker-end="url(#df-t-fwd)"></line>
+		<line class="fwd" x1="130" y1="294" x2="130" y2="314" marker-end="url(#df-t-fwd)"></line>
+		<line class="fwd" x1="130" y1="410" x2="130" y2="496" marker-end="url(#df-t-fwd)"></line>
+		<text class="flow-label" x="120" y="458" text-anchor="end">audio</text>
+
+		<line class="ret" x1="310" y1="500" x2="310" y2="186" marker-end="url(#df-t-ret)"></line>
+		<text class="flow-label accent" x="328" y="300" text-anchor="middle" transform="rotate(90 328 300)">text, language</text>
+
+		<text class="pipe-label" x="142" y="450">native messaging</text>
+		<text class="pipe-label sub" x="142" y="466">stdin and stdout,</text>
+		<text class="pipe-label sub" x="142" y="482">no network port</text>
+
+		<line class="net-line" x1="180" y1="686" x2="180" y2="742"></line>
+		<g class="cross">
+			<line x1="169" y1="703" x2="191" y2="725"></line>
+			<line x1="191" y1="703" x2="169" y2="725"></line>
+		</g>
+		<text class="net-note" x="204" y="719">Not used when</text>
+		<text class="net-note" x="204" y="735">you transcribe</text>
+		<rect class="net" x="110" y="746" width="140" height="42" rx="21"></rect>
+		<text class="net-text" x="180" y="772" text-anchor="middle">Internet</text>
+	</svg>
+
+	{
+		caption && (
+			<figcaption>
+				Nothing in this path opens a network connection. The extension has no host permissions,
+				native messaging is a pipe between two local processes, and the local program runs with
+				Hugging Face offline mode on, onnxruntime telemetry off, and the Linux kernel refusing it
+				network sockets.
+			</figcaption>
+		)
+	}
+</figure>
+
+<style>
+	.dataflow {
+		container-type: inline-size;
+	}
+	.dataflow svg {
+		font-family: var(--__sl-font);
+	}
+	.tall {
+		display: none !important;
+		max-width: 24rem;
+		margin-inline: auto;
+	}
+	/* The wide layout needs about 52rem to keep its labels readable; narrower columns,
+	   such as a docs page or a phone, get the tall layout. */
+	@container (max-width: 52rem) {
+		.wide {
+			display: none !important;
+		}
+		.tall {
+			display: block !important;
+		}
+	}
+	.computer {
+		fill: none;
+		stroke: var(--sl-color-accent);
+		stroke-width: 1.5;
+		stroke-dasharray: 6 5;
+	}
+	.chrome {
+		fill: var(--lt-surface);
+		stroke: var(--sl-color-gray-5);
+	}
+	.zone-label {
+		font-size: 15px;
+		font-weight: 600;
+		fill: var(--sl-color-text-accent);
+	}
+	.zone-sub {
+		font-size: 13px;
+		font-weight: 600;
+		fill: var(--sl-color-gray-3);
+	}
+	.box {
+		fill: var(--sl-color-black);
+		stroke: var(--sl-color-gray-4);
+	}
+	.box.host {
+		fill: var(--lt-surface);
+		stroke: var(--sl-color-gray-3);
+		stroke-width: 1.5;
+	}
+	.box-title {
+		font-size: 14px;
+		font-weight: 600;
+		fill: var(--sl-color-white);
+	}
+	.box-sub {
+		font-size: 13px;
+		fill: var(--sl-color-gray-2);
+	}
+	.box-sub.strong {
+		font-weight: 600;
+		fill: var(--sl-color-white);
+	}
+	.box-sub.small {
+		font-size: 12px;
+		fill: var(--sl-color-gray-3);
+	}
+	.mono {
+		font-family: var(--__sl-font-mono);
+		font-size: 12px;
+	}
+	.tag {
+		font-size: 11px;
+		font-weight: 600;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+		fill: var(--sl-color-gray-3);
+	}
+	.chip {
+		fill: var(--sl-color-accent-low);
+		stroke: var(--sl-color-accent);
+		stroke-width: 1;
+	}
+	.chip-text {
+		font-size: 12px;
+		font-weight: 600;
+		fill: var(--sl-color-accent-high);
+	}
+	.fwd {
+		stroke: var(--sl-color-gray-2);
+		stroke-width: 1.75;
+	}
+	.ret {
+		stroke: var(--sl-color-accent);
+		stroke-width: 1.75;
+	}
+	.head-fwd {
+		fill: var(--sl-color-gray-2);
+	}
+	.head-ret {
+		fill: var(--sl-color-accent);
+	}
+	.flow-label {
+		font-size: 12px;
+		font-weight: 600;
+		fill: var(--sl-color-gray-2);
+	}
+	.flow-label.accent {
+		fill: var(--sl-color-text-accent);
+	}
+	.pipe-label {
+		font-size: 12px;
+		font-weight: 600;
+		fill: var(--sl-color-white);
+	}
+	.pipe-label.sub {
+		font-weight: 400;
+		fill: var(--sl-color-gray-3);
+	}
+	.net-line {
+		stroke: var(--sl-color-gray-4);
+		stroke-width: 1.5;
+		stroke-dasharray: 3 4;
+	}
+	.cross line {
+		stroke: var(--lt-block);
+		stroke-width: 3;
+		stroke-linecap: round;
+	}
+	.net {
+		fill: var(--lt-block-bg);
+		stroke: var(--lt-block);
+		stroke-dasharray: 4 3;
+	}
+	.net-text {
+		font-size: 14px;
+		font-weight: 600;
+		fill: var(--lt-block);
+	}
+	.net-note {
+		font-size: 12px;
+		font-weight: 600;
+		fill: var(--lt-block);
+	}
+</style>

@@ -1,0 +1,49 @@
+---
+title: Uninstall
+description: Remove the local program, the model, the extension and its cached transcripts, and see what stays on disk.
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+import Src from '../../../components/Src.astro';
+
+<Steps>
+
+1. In the repository folder, run the uninstaller. Add `--remove-model` to delete the downloaded model as well.
+
+    ```sh
+    ./uninstall.sh                  # keeps the model
+    ./uninstall.sh --remove-model   # also deletes the model
+    ```
+
+    It removes:
+
+    - the host manifest `~/.config/google-chrome/NativeMessagingHosts/io.github.josesiqueira.local_voice_transcriber.json`, so Chrome can no longer start the program
+    - the Python environment `host/.venv`
+    - the log folder `~/.local/state/local-voice-transcriber`, or the folder set in `WAT_LOG_DIR`
+    - `~/.cache/Microsoft/DeveloperTools/.onnxruntime`, onnxruntime's own folder, which holds its telemetry event database
+    - with `--remove-model`: the model, about 1.6 GB. The script deletes it through the Hugging Face library's cache manager, which removes the model folder `models--mobiuslabsgmbh--faster-whisper-large-v3-turbo` and the model file in the shared folder `~/.cache/huggingface/hub/blobs/` that recent versions of the library use. It then removes the model folder and its entry in `.locks` directly, in case anything is left.
+
+    Without `--remove-model`, the model stays in `~/.cache/huggingface/hub/` and the script prints where it is.
+
+    <Aside type="note" title="Remove the model on the first run">
+    The cache manager runs from the Python environment `host/.venv`, which the script deletes. `install.sh` keeps the model file inside the model folder, so a later `--remove-model` without `host/.venv` still frees the space by deleting that folder. An older install may have put the model file in the shared folder `~/.cache/huggingface/hub/blobs/`. To delete it in that case, run `readlink -f ~/.cache/huggingface/hub/models--mobiuslabsgmbh--faster-whisper-large-v3-turbo/blobs/*` before the script, then delete the files it lists under `~/.cache/huggingface/hub/blobs/`.
+    </Aside>
+
+2. Open `chrome://extensions` and click **Remove** on the extension's card. This also deletes the transcripts cached in the extension's storage and the language choice made in its popup.
+
+3. Delete the repository folder.
+
+</Steps>
+
+## What stays on disk
+
+The uninstaller does not touch files that other programs may share. It prints a reminder about the first two.
+
+| Path | What it is | How to remove it |
+| --- | --- | --- |
+| `~/.cache/Microsoft/DeveloperTools/deviceid` | onnxruntime, the library that runs the speech detection filter, may create this device ID file. Other Microsoft developer tools use the same file, so the uninstaller leaves it. | Delete it if no other Microsoft tool on your computer uses it. |
+| uv's package cache (`~/.cache/uv/` by default) | Downloaded Python packages, shared by every project that uses `uv`. | `uv cache clean` removes it for all projects. |
+| Python 3.12 installed by `uv` | Only if `uv` downloaded Python because your system did not have 3.12. | `uv python list` shows it; `uv python uninstall 3.12` removes it. |
+| The model, if you did not pass `--remove-model` | About 1.6 GB in `~/.cache/huggingface/hub/`. | Run `./uninstall.sh --remove-model`. |
+
+The full list of paths is in [Files and paths](/local-voice-transcriber/reference/files/). The uninstaller is <Src path="uninstall.sh" />, about 50 lines.

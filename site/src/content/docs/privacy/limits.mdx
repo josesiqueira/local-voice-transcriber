@@ -1,0 +1,35 @@
+---
+title: Limits
+description: What running transcription locally does not protect against, and the known limits of the extension.
+---
+
+import RiskNotice from '../../../components/RiskNotice.astro';
+
+Keeping transcription on your computer removes one party from the picture: no transcription service ever receives your audio. It does not protect against everything. This page lists what remains.
+
+## What this does not protect against
+
+- WhatsApp and Meta: WhatsApp already delivered the voice note to your browser. This tool does not change what WhatsApp receives, stores or can see.
+- The WhatsApp Web page itself: the transcript is shown inside the WhatsApp Web page, and the audio passes through the page's messaging between scripts. Code running in that page, including WhatsApp's own scripts, can technically read both. The extension cannot prevent that.
+- Other extensions: any other extension with access to `web.whatsapp.com` can read the page, including the transcripts shown in it.
+- People with access to your user account: transcripts are stored unencrypted in your Chrome profile. Anyone who can read your files, or a backup of your profile, can read them.
+- A changed download at install time: you trust GitHub for the code, PyPI for the Python packages and Hugging Face for the model when you install. Python package versions are pinned in `host/uv.lock`, which records a hash for every file, and the model is pinned to a fixed revision, so a later change to those repositories does not change what an existing install uses. The first download still depends on trusting those services.
+- Network features inside libraries: onnxruntime contains Microsoft usage telemetry, and the Hugging Face library can download files. The launcher `host/run-host.sh` turns both off with environment variables; running the program without the launcher skips them. A future version of a library could add a network feature these settings do not cover. The kernel network block would still refuse its sockets, and it is worth repeating [check 7](/local-voice-transcriber/privacy/verify/#7-trace-the-programs-network-system-calls) after an update.
+- The reach of the kernel network block: it covers the local program only, not Chrome or WhatsApp Web, which are online by nature. Local Unix sockets stay allowed, because the NVIDIA driver uses them, so in principle the program could talk to another program on the computer that has network access; nothing in its code does this. The block starts when the Python script starts, so the Python interpreter's own startup comes before it; that startup reads only local files.
+
+## WhatsApp's terms of service
+
+<RiskNotice />
+
+The extension reads the audio of a note you click and adds text under it in your own browser. It never sends, forwards or automates messages and never exports chat history. That does not change what WhatsApp's terms say or how WhatsApp applies them.
+
+## Known limits
+
+- WhatsApp Web changes can break it. The extension finds voice notes by attributes in WhatsApp Web's page. When WhatsApp changes its page, the T button may disappear or capture may fail until the extension is updated.
+- No automatic updates. The extension is loaded from a folder, not installed from the Chrome Web Store, so you get fixes only by [updating](/local-voice-transcriber/guides/update/) yourself. There is no store review of the code either; you can [read it](/local-voice-transcriber/privacy/verify/#12-read-the-code).
+- The note may be marked as played. To capture a note, the extension usually presses the note's own play button with the sound muted, then pauses and rewinds it, because today's WhatsApp Web does not keep an audio element inside the message. WhatsApp may report that as played to the sender. This has not been verified either way.
+- A note may play out loud. If WhatsApp Web plays a note through the Web Audio interface instead of an audio element, the extension captures the audio but cannot mute or pause the playback, so you hear the note.
+- A playing note can fail. Pressing T while that note is already playing can fail with "Could not read this audio". Pause it first.
+- Very long notes may fail. Chrome's [service worker documentation](https://developer.chrome.com/docs/extensions/develop/concepts/service-workers/lifecycle) says it can stop an extension's service worker when a single event or API call takes longer than 5 minutes. It does not say whether this applies to `sendNativeMessage`, and the extension sets no time limit of its own. Very long notes, especially in CPU mode, may fail this way, most likely with "Transcriber connection lost. Retry".
+- Linux and Google Chrome only. See [Platform support](/local-voice-transcriber/reference/platform-support/).
+- Transcripts are not perfect. Accuracy depends on the audio quality, the language and the speaker. Check important details against the recording.

@@ -1,0 +1,168 @@
+---
+title: Transcribe WhatsApp Web voice notes on your own computer
+description: A Chrome extension and a local program that transcribe WhatsApp Web voice notes with Whisper large-v3-turbo on your own Linux computer. No audio leaves your computer.
+template: splash
+editUrl: false
+head:
+  - tag: meta
+    attrs:
+      property: og:type
+      content: website
+hero:
+  title: Transcribe WhatsApp Web voice notes on your own computer
+  tagline: A free Google Chrome extension and a small local program for reading the voice notes in your own account. Whisper large-v3-turbo runs on your GPU or CPU, and no audio leaves your computer.
+  actions:
+    - text: Install
+      link: /local-voice-transcriber/start/install/
+      icon: right-arrow
+    - text: How it works
+      link: /local-voice-transcriber/start/how-it-works/
+      variant: secondary
+    - text: View source
+      link: https://github.com/josesiqueira/local-voice-transcriber
+      variant: minimal
+      icon: external
+---
+
+import { Code, Steps } from '@astrojs/starlight/components';
+import DataFlow from '../../components/DataFlow.astro';
+import { CLONE_URL, REPO_NAME, TERMS_RISK_NOTICE, pageUrl } from '../../consts';
+
+<h2 class="sr-only">Highlights</h2>
+
+<div class="lt-facts">
+  <div>
+    <h3>Only when you click</h3>
+    <p>Each voice note gets a small T button. Nothing is transcribed until you press it, and the text appears under the note.</p>
+  </div>
+  <div>
+    <h3>Any language Whisper knows</h3>
+    <p>The language is detected for each note and shown as a tag, such as EN. You can limit detection to the languages you receive in the extension's popup.</p>
+  </div>
+  <div>
+    <h3>GPU or CPU</h3>
+    <p>Uses an NVIDIA GPU through CUDA when one is available and falls back to the CPU on any GPU error. No CUDA toolkit to install.</p>
+  </div>
+  <div>
+    <h3>No background program</h3>
+    <p>Chrome starts the local program for one request. It replies and exits, which also frees the GPU memory. There is no server and no open port.</p>
+  </div>
+  <div>
+    <h3>Kept on this computer</h3>
+    <p>Transcripts are cached in the extension's storage, so after a reload they show again without running the model.</p>
+  </div>
+  <div>
+    <h3>Open source, no telemetry</h3>
+    <p>Licensed under AGPL-3.0. The extension and the program contain no analytics, crash reporting or update checks, and the launcher turns off the telemetry built into one library.</p>
+  </div>
+</div>
+
+## How it works
+
+<p class="lt-section-lead">The extension gets the voice note's audio from the WhatsApp Web page and passes it to a program on your computer through Chrome native messaging, a pipe between two local processes. The program transcribes it and sends the text back.</p>
+
+<DataFlow />
+
+[Read the full walkthrough](/local-voice-transcriber/start/how-it-works/), including what happens at each step and why the program exits after every request.
+
+## Privacy
+
+<p class="lt-section-lead">The audio goes from the WhatsApp Web tab to the local program and nowhere else. Each claim below points to the mechanism that enforces it, and you can check every one yourself.</p>
+
+- The extension has no host permissions and makes no network requests. The local program runs with Hugging Face offline mode on (`HF_HUB_OFFLINE=1`) and loads the model only from the local cache.
+- The Linux kernel refuses the local program every network socket. The program installs this block itself, a seccomp filter, before it loads any third-party library or reads the audio. If the block cannot be installed, nothing is transcribed.
+- The network is used only when you install or update: `git` gets the code, and `install.sh` downloads Python packages from PyPI and the model, about 1.6 GB, from Hugging Face. A transcription never uses the network, and the local program works with the computer offline.
+- There is no telemetry, crash reporting or update check. Two libraries have telemetry of their own, and the launcher turns both off: Hugging Face (`HF_HUB_DISABLE_TELEMETRY=1`) and onnxruntime, which runs the speech filter and would otherwise send usage data to Microsoft (`ORT_DISABLE_TELEMETRY=1`).
+- The program's log holds timings, the device, the language and a character count. It never writes the audio or the transcript to disk.
+
+| Permission | Why the extension needs it | What Chrome shows |
+| --- | --- | --- |
+| `nativeMessaging` | Pass the audio to the local program and get the text back | Communicate with cooperating native applications |
+| `storage` | Cache transcripts and the language choice on this computer | No warning |
+| Content script on `https://web.whatsapp.com/*` | Add the T button and read the voice note audio | Site access for web.whatsapp.com |
+
+The extension requests nothing else: no host permissions, no `tabs`, no `webRequest`, no `cookies`, no `history`. See [Privacy](/local-voice-transcriber/privacy/privacy/) for where data is stored and for how long, and [Verify it yourself](/local-voice-transcriber/privacy/verify/) for checks with expected results.
+
+## Install
+
+<p class="lt-section-lead">You need Linux, Google Chrome from Google's .deb or .rpm package, `uv` and about 4.5 GB of free disk space. An NVIDIA GPU is optional. The installer uses no `sudo`.</p>
+
+<Steps>
+
+1. Get the code, and read `install.sh` before you run it.
+
+    <Code lang="sh" code={`git clone ${CLONE_URL}\ncd ${REPO_NAME}`} />
+
+2. Run the installer. It creates the Python environment, downloads the model, registers the program with Chrome and runs a self-check.
+
+    ```sh
+    ./install.sh
+    ```
+
+3. In Chrome, open `chrome://extensions`, turn on **Developer mode**, click **Load unpacked** and select the `extension` folder of the repository. Then open WhatsApp Web and press T under a voice note.
+
+</Steps>
+
+The [install guide](/local-voice-transcriber/start/install/) explains each step and what the installer writes.
+
+## Questions
+
+<details class="lt-faq">
+<summary>Does it send my voice notes anywhere?</summary>
+
+No. The audio goes from the WhatsApp Web tab to the extension, then over Chrome native messaging (standard input and output) to the local program. None of these steps opens a network connection, and the kernel refuses the local program any network socket. The [verification page](/local-voice-transcriber/privacy/verify/) shows how to confirm this, including running the program in a network namespace with no network at all.
+
+</details>
+
+<details class="lt-faq">
+<summary>Will the sender see that I played the note?</summary>
+
+Possibly. To capture a note, the extension usually presses the note's own play button with the sound muted, captures the audio, then pauses and rewinds the note. WhatsApp may count that as playing the note. This has not been verified either way.
+
+</details>
+
+<details class="lt-faq">
+<summary>Which languages does it transcribe?</summary>
+
+Every language Whisper supports. The language is detected for each note. If you only receive notes in a few languages, you can limit detection to those in the extension's popup: click its icon in Chrome's toolbar and check the languages. See [Choose languages](/local-voice-transcriber/guides/languages/).
+
+</details>
+
+<details class="lt-faq">
+<summary>How fast is it?</summary>
+
+On a recent NVIDIA GPU a note is usually transcribed several times faster than it takes to play. CPU mode is several times slower than GPU mode. The first transcription after a reboot takes longer while the model is read from disk.
+
+</details>
+
+<details class="lt-faq">
+<summary>Why only Linux and Google Chrome?</summary>
+
+Native messaging needs a per-platform installer. macOS would need its own install script and would run on the CPU only. Windows registers native programs in the registry. Firefox uses a different extension and native messaging setup. Contributions are welcome; see [Platform support](/local-voice-transcriber/reference/platform-support/).
+
+</details>
+
+<details class="lt-faq">
+<summary>Is using it allowed by WhatsApp?</summary>
+
+{TERMS_RISK_NOTICE}
+
+The extension only reads the audio of a note you click and shows text under it. It never sends, forwards or automates messages and never exports chat history. See [Limits](/local-voice-transcriber/privacy/limits/#whatsapps-terms-of-service).
+
+</details>
+
+<details class="lt-faq">
+<summary>Is it on the Chrome Web Store?</summary>
+
+No. You load it from the repository folder as an unpacked extension. Unpacked extensions do not update automatically; [Update](/local-voice-transcriber/guides/update/) lists the commands.
+
+</details>
+
+<details class="lt-faq">
+<summary>How do I remove it?</summary>
+
+Run `./uninstall.sh` (add `--remove-model` to delete the model as well), then remove the extension in `chrome://extensions`. [Uninstall](/local-voice-transcriber/guides/uninstall/) lists everything that is removed and the few things that are not.
+
+</details>
+
+<p class="lt-platform"><strong>Platform support:</strong> Linux on x86_64 with Google Chrome from Google's .deb or .rpm package. Not supported yet: macOS, Windows, Firefox, and Flatpak or Snap builds of Chrome. Details on <a href={pageUrl('reference/platform-support/')}>Platform support</a>.</p>

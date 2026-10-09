@@ -1,0 +1,7 @@
+---
+// The terms of service risk notice. The text lives in src/consts.ts so every page shows the same words.
+import { Aside } from '@astrojs/starlight/components';
+import { TERMS_RISK_NOTICE } from '../consts';
+---
+
+<Aside type="caution" title="Your own risk">{TERMS_RISK_NOTICE}</Aside>

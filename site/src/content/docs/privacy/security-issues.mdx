@@ -1,0 +1,38 @@
+---
+title: Reporting a security issue
+description: Report a vulnerability privately through GitHub, what to include, and what is in scope.
+---
+
+import { REPO_URL } from '../../../consts';
+
+If you find a security problem, report it privately so it can be fixed before it is public. Do not open a public issue for it.
+
+## How to report
+
+Use GitHub's private vulnerability reporting on the repository:
+
+1. Open the repository's <a href={`${REPO_URL}/security`}>Security</a> tab.
+2. Click **Report a vulnerability**.
+3. Fill in the form and submit it.
+
+Only you and the maintainers can see the report. You need a GitHub account. GitHub describes the process in [Privately reporting a security vulnerability](https://docs.github.com/en/code-security/security-advisories/guidance-on-reporting-and-writing-information-about-vulnerabilities/privately-reporting-a-security-vulnerability).
+
+There is no email address for reports.
+
+## What to include
+
+- What an attacker can do, and what they need first (for example another extension installed, or local access).
+- Steps to reproduce, or a proof of concept.
+- The commit or version you tested.
+- Your Chrome version and Linux distribution, if they matter for the problem.
+
+Remove personal content, such as real voice notes or transcripts, from anything you attach.
+
+## In scope
+
+- The extension in `extension/`.
+- The local program in `host/`, including the native messaging protocol.
+- `install.sh` and `uninstall.sh`, including the files they write and their permissions.
+- Any way the audio, the text or the cache could reach the network or another program.
+
+Problems in WhatsApp, Google Chrome, faster-whisper or the model belong to those projects. If you are not sure, report it here; the maintainers pass it on where needed.

@@ -1,0 +1,142 @@
+---
+title: Verify it yourself
+description: Checks you can run to confirm the privacy claims, each with the result you should see.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+import Src from '../../../components/Src.astro';
+
+The claims on the [Privacy](/local-voice-transcriber/privacy/privacy/) page are meant to be checked, not trusted. Each check below has the command or the place to look, and the result you should see. Run the commands from the repository folder.
+
+## 1. Read the permissions in the manifest
+
+```sh
+grep -nE '"permissions"|"matches"|host_permissions' extension/manifest.json
+```
+
+Expected: three lines, and none of them mentions `host_permissions`:
+
+```txt
+13:  "permissions": ["nativeMessaging", "storage"],
+17:      "matches": ["https://web.whatsapp.com/*"],
+23:      "matches": ["https://web.whatsapp.com/*"],
+```
+
+Line numbers can differ between versions.
+
+## 2. Read the permissions Chrome reports
+
+Open `chrome://extensions`, find the extension and click **Details**.
+
+Expected: the permissions section lists communicating with cooperating native applications, and site access lists only `https://web.whatsapp.com/*`.
+
+## 3. Search the extension for network calls
+
+```sh
+grep -rnE 'fetch\(|XMLHttpRequest|WebSocket|sendBeacon|EventSource|importScripts' extension/
+```
+
+Expected: one result, in `extension/page-hook.js`:
+
+```js
+const blob = blobs.get(url) || (await (await fetch(url)).blob());
+```
+
+That call only ever receives `blob:` URLs, which point to data already in the page's memory. The code checks the `blob:` prefix before it gets there. The search also covers the popup's files, which have no network calls.
+
+## 4. Watch the extension's network traffic
+
+1. In `chrome://extensions`, turn on **Developer mode** if it is off.
+2. On the extension's card, click the **service worker** link next to "Inspect views". DevTools opens for the service worker.
+3. Open the **Network** tab.
+4. Transcribe a voice note in WhatsApp Web.
+
+Expected: no requests appear in the service worker's Network tab. (The WhatsApp Web tab's own DevTools shows WhatsApp's traffic, which happens with or without the extension.) The content scripts run in the WhatsApp Web tab, so any request from them would appear there, mixed with WhatsApp's own traffic; check 3 covers their code.
+
+## 5. Transcribe with the computer offline
+
+1. Open a chat in WhatsApp Web and play a voice note once, so WhatsApp downloads its audio.
+2. Turn off networking: unplug the cable, turn off Wi-Fi, or use your network settings.
+3. Press T under that note.
+
+Expected: the transcript appears. Turn networking back on afterwards. If WhatsApp Web cannot play the note while offline, the capture fails with "Could not read this audio"; use check 6 or 7 instead.
+
+## 6. Run the program with no network at all
+
+Linux can start a program in a new network namespace, where the only network interface is a loopback interface that is switched off. Run the program inside one, the way Chrome would, with a recording of speech of your own (any format FFmpeg reads, such as `.ogg`, `.mp3` or `.wav`):
+
+```sh
+unshare --net --map-root-user host/.venv/bin/python host/native_client.py host/run-host.sh speech.ogg
+```
+
+Expected: a reply that starts with `{"ok": true, "text": "...`. This shows the program works without a network; check 7 shows whether it tries to connect. The program already blocks its own network access (check 8); this check removes the network from the outside as well. This needs unprivileged user namespaces. Ubuntu 24.04 and later restrict them by default, and `unshare` then reports "Operation not permitted"; use check 7 instead.
+
+<Aside type="note">
+The bundled `tests/mock-audio.ogg` is a tone, not speech. With it, the program stops at the speech check before it loads the model, so use a real recording for checks 6 and 7.
+</Aside>
+
+## 7. Trace the program's network system calls
+
+This uses `strace`; install it from your distribution's packages if you do not have it.
+
+```sh
+strace -f -e trace=network -o /tmp/host.trace \
+  host/.venv/bin/python host/native_client.py host/run-host.sh speech.ogg
+grep -E 'AF_INET|AF_INET6' /tmp/host.trace
+```
+
+Expected: the second command prints nothing. The trace has no internet sockets, which means nothing in the program even tried to open one.
+
+Because the program blocks its own network access (check 8), any attempt would show up as a line ending in `= -1 EACCES (Permission denied)`: something tried to open an internet socket and the kernel refused it. That is not a leak, but it means a library tried to connect despite the settings that tell it not to. Check that `host/run-host.sh` still exports `ORT_DISABLE_TELEMETRY=1`: without it, onnxruntime tries to reach Microsoft's telemetry server during a transcription. A line with an internet socket that does not end in `EACCES` would mean the kernel block was not in place; check 8 and the host log then show why. With an NVIDIA GPU you may see `AF_UNIX` lines: these are local sockets, for example the NVIDIA driver checking for its multi-process service.
+
+## 8. Check that the kernel network block was in place
+
+```sh
+grep network_blocked ~/.local/state/local-voice-transcriber/host.log | tail -1
+```
+
+Expected: the last start line ends with `network_blocked=True`, for example `start origin=chrome-extension://aclgfofogdialjfpeplknjloiemchjcf/ network_blocked=True`. The program writes this line for every request, right after it tries to install the seccomp filter from <Src path="host/netblock.py" />. If it ends with `network_blocked=False`, that request was not transcribed; the next lines of the log give the reason.
+
+## 9. Check which extension may start the program
+
+```sh
+cat ~/.config/google-chrome/NativeMessagingHosts/io.github.josesiqueira.local_voice_transcriber.json
+```
+
+Expected: `"type": "stdio"`, a `"path"` that ends in `host/run-host.sh` inside your repository folder, and one entry in `allowed_origins`: `chrome-extension://aclgfofogdialjfpeplknjloiemchjcf/`.
+
+## 10. Check the offline and telemetry settings of the launcher
+
+```sh
+grep -E 'HF_HUB|ORT_' host/run-host.sh
+```
+
+Expected:
+
+```txt
+export HF_HUB_OFFLINE=1
+export HF_HUB_DISABLE_TELEMETRY=1
+export ORT_DISABLE_TELEMETRY=1
+```
+
+## 11. Read the log
+
+```sh
+cat ~/.local/state/local-voice-transcriber/host.log
+```
+
+Expected: lines with timings, the device, the language, byte and character counts, and no transcript text.
+
+## 12. Read the code
+
+The code that handles your audio is short enough to read in one sitting: about 750 lines of JavaScript in `extension/` and about 530 lines of Python in `host/`. Start with these files:
+
+| File | What to look for |
+| --- | --- |
+| <Src path="extension/manifest.json" /> | Permissions and where the scripts run |
+| <Src path="extension/page-hook.js" /> | How the audio is read from the page |
+| <Src path="extension/background.js" /> | The single call to `chrome.runtime.sendNativeMessage` |
+| <Src path="host/run-host.sh" /> | The offline and telemetry environment variables |
+| <Src path="host/transcribe_host.py" /> | One request in, one reply out, then exit |
+| <Src path="host/netblock.py" /> | The seccomp filter that makes the kernel refuse network sockets |
+| <Src path="host/engine.py" /> | Model loading from the local cache only |
