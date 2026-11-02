@@ -24,6 +24,7 @@ Environment variables change some of these locations: `HF_HOME` or `HF_HUB_CACHE
 | --- | --- | --- |
 | The extension's `chrome.storage.local`, in your Chrome profile | Cached transcripts, one entry per WhatsApp message ID, under the key `t:<message ID>`. Each entry holds `text`, `language`, `device`, `seconds` and `createdAt`. Not encrypted. Limited to 10 MB. | Removing the extension in `chrome://extensions` |
 | The same storage, key `settings` | The language choice made in the extension's popup, as `{ "languages": [...] }`. See [Configuration](/local-voice-transcriber/reference/configuration/#languages). | Removing the extension in `chrome://extensions` |
+| The extension's `chrome.storage.session`, in memory only, key `status` | The latest self-check result after you played a voice note that got no T button: `state`, the structure `report` and the time `at`. See [Troubleshooting](/local-voice-transcriber/guides/troubleshooting/#no-t-button-under-voice-notes). | A note you play that is recognised again, or closing Chrome, or reloading or updating the extension |
 | The extension itself | Nothing is copied: Chrome loads it from `<repo>/extension/` each time it starts. | Removing the extension and deleting the folder |
 
 ## Written by other tools

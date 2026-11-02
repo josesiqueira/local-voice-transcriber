@@ -126,7 +126,14 @@ Code: `internal_error`. Both the GPU attempt and the CPU attempt failed, or some
 - Reload the WhatsApp Web tab. The extension adds buttons only in tabs loaded after it was installed or reloaded.
 - The button appears only under voice notes and audio messages, not under videos or other files.
 
-If it is still missing, WhatsApp Web has probably changed the structure of its page. All page lookups are in <Src path="extension/selectors.js" />. The repository has two diagnostic scripts you can paste into the DevTools console on `web.whatsapp.com` (Chrome asks you to type "allow pasting" the first time):
+If it is still missing, WhatsApp Web has probably changed the structure of its page. The extension notices this by itself: when you play a voice note with WhatsApp's own play button and that note has no T button, the extension's icon in Chrome's toolbar shows a red **!** in that tab. Click the icon. The popup shows the notice "Voice notes not recognised" above the language settings, with two buttons:
+
+- **Copy report** copies a short report of the page structure around the note you played. Paste it into a message to the maintainer or into an issue.
+- **Open an issue** opens a new issue on GitHub in a new tab, with the title filled in. Paste the report into it.
+
+The report is built on your computer and holds only the page structure: element names, roles, WhatsApp's icon names and test IDs (with message IDs replaced by `<id>`), and labels made only of media player words, such as "Voice message". It leaves out message IDs, message text, phone numbers and links; any other label shows only as its length. It starts with the extension version, the Chrome version, the date and a few counts. Read it before you send it. The **!** goes away by itself once a note you play has a T button again.
+
+All page lookups are in <Src path="extension/selectors.js" />. If you want more detail, the repository has two diagnostic scripts you can paste into the DevTools console on `web.whatsapp.com` (Chrome asks you to type "allow pasting" the first time):
 
 - <Src path="docs/structure-probe.js" /> prints the structure of voice note messages: element names and stable attributes, with IDs and phone numbers replaced.
 - <Src path="docs/capture-probe.js" /> records which browser audio functions WhatsApp Web calls when a note plays: function names, object types, byte counts, URL schemes and hosts, no audio, text or full URLs.

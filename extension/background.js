@@ -1,7 +1,10 @@
 // Service worker: takes transcription requests from content scripts over a port,
 // runs them one at a time through the native host, and maps failures to error codes.
+// It also shows the self-check result from selfcheck.js on the toolbar icon.
 const HOST_NAME = "io.github.josesiqueira.local_voice_transcriber";
 const SETTINGS_KEY = "settings"; // keep equal to popup.js; transcripts use the "t:" prefix
+const STATUS_KEY = "status"; // keep equal to popup.js; in chrome.storage.session
+const MAX_REPORT_CHARS = 20000;
 
 // The only path to the native host. Tests replace send() through the worker's evaluate.
 globalThis.hostTransport = {
@@ -92,4 +95,23 @@ chrome.runtime.onConnect.addListener((port) => {
       })
       .catch((error) => console.warn("[wat] could not send the result", error));
   });
+});
+
+// "not_recognised": a voice note played that got no [T] button. The badge is per tab, and
+// the latest report stays in session storage (memory only) for the popup until Chrome closes.
+async function showStatus(tabId, state, report) {
+  if (state === "not_recognised") {
+    await chrome.action.setBadgeBackgroundColor({ tabId, color: "#c5221f" });
+    await chrome.action.setBadgeText({ tabId, text: "!" });
+    const status = { state, report: String(report || "").slice(0, MAX_REPORT_CHARS), at: Date.now() };
+    await chrome.storage.session.set({ [STATUS_KEY]: status });
+  } else if (state === "ok") {
+    await chrome.action.setBadgeText({ tabId, text: "" });
+    await chrome.storage.session.remove(STATUS_KEY);
+  }
+}
+
+chrome.runtime.onMessage.addListener((message, sender) => {
+  if (message?.type !== "status" || typeof sender.tab?.id !== "number") return;
+  showStatus(sender.tab.id, message.state, message.report).catch((error) => console.warn("[wat] could not show the status", error));
 });

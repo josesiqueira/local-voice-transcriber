@@ -92,7 +92,7 @@ Then remove the extension in `chrome://extensions`. This also deletes its cached
 | Local transcriber not installed. Run install.sh | Run `./install.sh`. If the repository folder was moved, run it again from the new location. |
 | Transcriber connection lost. Retry | Reload the WhatsApp Web tab, which is needed after the extension is reloaded or updated. |
 | Could not block network access, so nothing was transcribed. See host.log | The kernel refused the network block, for example a kernel without seccomp or a system that is not x86_64. Read `host.log`. This tool supports Linux on x86_64 only. |
-| No **T** button appears | WhatsApp Web may have changed its page. See [Troubleshooting](https://josesiqueira.github.io/local-voice-transcriber/guides/troubleshooting/). |
+| No **T** button appears | WhatsApp Web may have changed its page. When you play a voice note that got no T button, the extension's toolbar icon shows a red **!** and its popup shows the notice "Voice notes not recognised". Click **Copy report** and send the report to the maintainer, or click **Open an issue**. The report holds only the page structure. See [Troubleshooting](https://josesiqueira.github.io/local-voice-transcriber/guides/troubleshooting/#no-t-button-under-voice-notes). |
 
 The program's log is in `~/.local/state/local-voice-transcriber/host.log`. All messages and fixes are listed in the [documentation](https://josesiqueira.github.io/local-voice-transcriber/guides/troubleshooting/).
 

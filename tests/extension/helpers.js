@@ -35,7 +35,8 @@ const test = base.test.extend({
     await use(worker);
   },
   openMock: async ({ context }, use) => {
-    await use(async ({ variant = "detached", delay = 0, audioFile = MOCK_AUDIO, dark = false, label = "", icons = true } = {}) => {
+    // The options match the mock page's URL parameters (see tests/mock-whatsapp.html).
+    await use(async ({ variant = "detached", delay = 0, audioFile = MOCK_AUDIO, dark = false, label = "", voiceLabel = "", icons = true, slider = true, marker = "", ids = "", tails = false, sides = true } = {}) => {
       await context.route("https://web.whatsapp.com/**", (route) => {
         const url = new URL(route.request().url());
         if (url.pathname === "/mock-audio.ogg") {
@@ -44,7 +45,16 @@ const test = base.test.extend({
         return route.fulfill({ body: MOCK_PAGE, contentType: "text/html" });
       });
       const page = context.pages()[0] || (await context.newPage());
-      await page.goto(`https://web.whatsapp.com/?variant=${variant}&delay=${delay}${label ? `&label=${encodeURIComponent(label)}` : ""}${icons ? "" : "&icons=0"}`);
+      const params = new URLSearchParams({ variant, delay: String(delay) });
+      if (label) params.set("label", label);
+      if (voiceLabel) params.set("voicelabel", voiceLabel);
+      if (!icons) params.set("icons", "0");
+      if (!slider) params.set("slider", "0");
+      if (marker) params.set("marker", marker);
+      if (ids) params.set("ids", ids);
+      if (tails) params.set("tails", "1");
+      if (!sides) params.set("sides", "0");
+      await page.goto(`https://web.whatsapp.com/?${params}`);
       if (dark) await page.evaluate(() => document.body.classList.add("dark"));
       return page;
     });
@@ -99,6 +109,30 @@ const IDS = {
   voiceOut: "true_111111111111@c.us_3EB0AAAA0003",
 };
 
+// The same IDs as WhatsApp Web gives them in some builds: a bare hash, without "true_"/"false_".
+const bareId = (id) => id.slice(id.lastIndexOf("_") + 1);
+
 const box = (page, id) => page.locator(`.wat-box[data-wat-id="${id}"]`);
 
-module.exports = { test, expect: base.expect, stubHost, hostCalls, openPopup, IDS, box, ROOT };
+// Records the self-check messages that reach the service worker, with the sending tab.
+// A second listener next to background.js's own; it changes nothing.
+async function watchStatus(worker) {
+  await worker.evaluate(() => {
+    globalThis.__watStatus = [];
+    chrome.runtime.onMessage.addListener((message, sender) => {
+      if (message?.type === "status") globalThis.__watStatus.push({ state: message.state, report: message.report, tabId: sender.tab?.id });
+    });
+  });
+}
+
+const statusMessages = (worker) => worker.evaluate(() => globalThis.__watStatus || []);
+
+// The toolbar badge text for one tab, and the stored status (or null).
+async function badgeAndStatus(worker, tabId) {
+  return worker.evaluate(async (tabId) => ({
+    badge: await chrome.action.getBadgeText(typeof tabId === "number" ? { tabId } : {}),
+    status: (await chrome.storage.session.get("status")).status || null,
+  }), tabId);
+}
+
+module.exports = { test, expect: base.expect, stubHost, hostCalls, openPopup, IDS, bareId, box, watchStatus, statusMessages, badgeAndStatus, ROOT };

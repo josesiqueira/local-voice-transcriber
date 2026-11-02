@@ -10,6 +10,8 @@
   --accent: #0b6bcb;
   --accent-soft: rgba(11, 107, 203, 0.08);
   --danger: #c5221f;
+  --danger-soft: rgba(197, 34, 31, 0.06);
+  --danger-border: rgba(197, 34, 31, 0.35);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -23,6 +25,8 @@
     --accent: #7cb4f5;
     --accent-soft: rgba(124, 180, 245, 0.1);
     --danger: #f28b82;
+    --danger-soft: rgba(242, 139, 130, 0.08);
+    --danger-border: rgba(242, 139, 130, 0.4);
   }
 }
 
@@ -55,6 +59,30 @@ main { padding: 14px 16px 16px; }
 
 h1 { margin: 10px 0 2px; font-size: 16px; font-weight: 600; letter-spacing: -0.01em; }
 .help { margin: 0 0 12px; color: var(--muted); }
+
+.notice {
+  margin: 10px 0 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--danger-border);
+  border-radius: 8px;
+  background: var(--danger-soft);
+}
+.notice[hidden] { display: none; }
+.notice h2 { margin: 0 0 4px; color: var(--danger); font-size: 13px; font-weight: 600; }
+.notice p { margin: 0 0 10px; }
+.notice-actions { display: flex; align-items: center; gap: 12px; }
+.notice button {
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.notice button:hover { background: var(--surface); }
+.notice a { color: var(--accent); }
 
 .modes { display: grid; gap: 6px; margin: 0; padding: 0; border: 0; }
 .mode {
@@ -125,7 +153,7 @@ input[type="search"]::placeholder { color: var(--muted); }
 }
 
 /* Keyboard focus: a clear ring on every control, none for mouse clicks. */
-input:focus-visible {
+input:focus-visible, button:focus-visible, a:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }

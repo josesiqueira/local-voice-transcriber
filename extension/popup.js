@@ -1,7 +1,10 @@
 // Action popup: chooses the languages that detection picks from and saves the choice on
-// every change. background.js reads it for each transcription. Loaded after languages.js.
+// every change. background.js reads it for each transcription. When the self-check found
+// voice notes it could not recognise, a notice at the top offers the structure report.
+// Loaded after languages.js.
 (() => {
   const SETTINGS_KEY = "settings"; // keep equal to background.js
+  const STATUS_KEY = "status"; // keep equal to background.js
   const locales = navigator.languages;
 
   const modeInputs = document.querySelectorAll('input[name="mode"]');
@@ -11,6 +14,8 @@
   const list = document.getElementById("list");
   const noMatch = document.getElementById("no-match");
   const errorLine = document.getElementById("error");
+  const notice = document.getElementById("notice");
+  const copyReport = document.getElementById("copy-report");
 
   let settings = {};
   let mode = "any";
@@ -128,7 +133,33 @@
 
   search.addEventListener("input", applySearch);
 
+  let report = "";
+  copyReport.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(report);
+      copyReport.textContent = "Copied";
+    } catch (error) {
+      console.warn("[wat] copy failed", error);
+      copyReport.textContent = "Copy failed";
+    }
+    setTimeout(() => (copyReport.textContent = "Copy report"), 1500);
+  });
+
+  async function loadStatus() {
+    let status;
+    try {
+      status = (await chrome.storage.session.get(STATUS_KEY))[STATUS_KEY];
+    } catch (error) {
+      console.warn("[wat] could not read the status", error);
+      return;
+    }
+    if (status?.state !== "not_recognised") return;
+    report = String(status.report || "");
+    notice.hidden = false;
+  }
+
   async function load() {
+    await loadStatus();
     try {
       const stored = (await chrome.storage.local.get(SETTINGS_KEY))[SETTINGS_KEY];
       if (stored && typeof stored === "object") settings = stored;

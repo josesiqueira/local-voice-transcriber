@@ -1,7 +1,9 @@
 // Runs in the page's own JavaScript world at document_start (see manifest.json).
 // It keeps references to the audio Blobs WhatsApp creates and, when armed by
-// capture.js, hands over the bytes of the next audio that starts playing. It wraps
-// standard browser functions only; it never touches WhatsApp's own modules.
+// capture.js, hands over the bytes of the next audio that starts playing. When not
+// armed it only says that some audio played (no data, no URL), for the self-check in
+// selfcheck.js. It wraps standard browser functions only; it never touches WhatsApp's
+// own modules.
 (() => {
   const TAG = "__wat";
   const MAX_BLOBS = 20;
@@ -10,6 +12,14 @@
   let armed = null; // {id, timer}
 
   const post = (message, transfer = []) => window.postMessage({ [TAG]: "page", ...message }, location.origin, transfer);
+
+  function notePlayed() {
+    try {
+      post({ type: "played" });
+    } catch (error) {
+      // the self-check must never disturb WhatsApp's own call
+    }
+  }
 
   const originalCreate = URL.createObjectURL;
   URL.createObjectURL = function (object) {
@@ -46,7 +56,11 @@
   const originalPlay = HTMLMediaElement.prototype.play;
   HTMLMediaElement.prototype.play = function () {
     const src = this.currentSrc || this.src || "";
-    if (!armed || !(this instanceof HTMLAudioElement) || !src.startsWith("blob:")) return originalPlay.apply(this, arguments);
+    if (!(this instanceof HTMLAudioElement) || !src.startsWith("blob:")) return originalPlay.apply(this, arguments);
+    if (!armed) {
+      notePlayed();
+      return originalPlay.apply(this, arguments);
+    }
     const { id } = armed;
     disarm();
     const media = this;
@@ -77,7 +91,8 @@
   const AudioContextBase = window.BaseAudioContext || window.AudioContext;
   const originalDecode = AudioContextBase.prototype.decodeAudioData;
   AudioContextBase.prototype.decodeAudioData = function (data) {
-    if (armed && data instanceof ArrayBuffer) {
+    if (!armed) notePlayed();
+    else if (data instanceof ArrayBuffer) {
       const { id } = armed;
       disarm();
       try {
