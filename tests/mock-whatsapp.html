@@ -27,8 +27,10 @@ const list = document.getElementById("list");
 const PLAY_DELAY_MS = Number(new URLSearchParams(location.search).get("delay") || 0);
 // "labelled" copies current WhatsApp Web markup: the play button carries only an
 // aria-label (no data-icon), and the bubble has a ptt-status icon. ?label= sets the button's
-// label, to mimic another interface language.
+// label, to mimic another interface language. ?icons=0 leaves out the ptt-status icon:
+// later WhatsApp Web markup has no audio-related data-icon at all.
 const PLAY_LABEL = new URLSearchParams(location.search).get("label") || "Play voice message";
+const STATUS_ICON = new URLSearchParams(location.search).get("icons") === "0" ? "" : '<span data-icon="ptt-status"><svg></svg></span>';
 window.mock = { plays: 0, playsById: {} };
 
 async function audioBlob() {
@@ -86,7 +88,7 @@ function voiceRow(id, outgoing) {
           <div><div><button type="button" aria-label="${PLAY_LABEL}"><div></div></button></div>
             <div><span aria-label="Voice message"></span><div><div role="slider" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div></div></div></div>
           <div><button type="button" aria-label="Change playback speed, currently 1×"><div></div></button>
-            <span data-icon="ptt-status"><svg></svg></span></div>
+            ${STATUS_ICON}</div>
         </div>
       </div>
     </div>` : `

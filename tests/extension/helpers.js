@@ -35,7 +35,7 @@ const test = base.test.extend({
     await use(worker);
   },
   openMock: async ({ context }, use) => {
-    await use(async ({ variant = "detached", delay = 0, audioFile = MOCK_AUDIO, dark = false, label = "" } = {}) => {
+    await use(async ({ variant = "detached", delay = 0, audioFile = MOCK_AUDIO, dark = false, label = "", icons = true } = {}) => {
       await context.route("https://web.whatsapp.com/**", (route) => {
         const url = new URL(route.request().url());
         if (url.pathname === "/mock-audio.ogg") {
@@ -44,7 +44,7 @@ const test = base.test.extend({
         return route.fulfill({ body: MOCK_PAGE, contentType: "text/html" });
       });
       const page = context.pages()[0] || (await context.newPage());
-      await page.goto(`https://web.whatsapp.com/?variant=${variant}&delay=${delay}${label ? `&label=${encodeURIComponent(label)}` : ""}`);
+      await page.goto(`https://web.whatsapp.com/?variant=${variant}&delay=${delay}${label ? `&label=${encodeURIComponent(label)}` : ""}${icons ? "" : "&icons=0"}`);
       if (dark) await page.evaluate(() => document.body.classList.add("dark"));
       return page;
     });

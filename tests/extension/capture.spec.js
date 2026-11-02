@@ -39,6 +39,14 @@ test("play button found from the seek bar when its label is in an unknown langua
   expect(await page.evaluate(() => window.mock.plays)).toBe(1);
 });
 
+test("voice note recognised without any audio icon marker", async ({ openMock, worker }) => {
+  await stubHost(worker);
+  const page = await openMock({ variant: "labelled", icons: false });
+  const bytes = await transcribeAndGetBytes(page, worker);
+  expect(bytes.subarray(0, 4).toString()).toBe("OggS");
+  expect(await page.evaluate(() => window.mock.plays)).toBe(1);
+});
+
 test("Web Audio playback is captured from decodeAudioData", async ({ openMock, worker }) => {
   await stubHost(worker);
   const page = await openMock({ variant: "webaudio" });

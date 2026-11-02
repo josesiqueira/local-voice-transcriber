@@ -1,10 +1,9 @@
 // Every WhatsApp Web DOM lookup lives here. Generated class names change often, so
-// only attributes are used: data-id on the message, data-icon on icons, role="slider"
-// on the voice note seek bar, and the <audio> element. When WhatsApp Web changes its
-// page, update this file.
+// only attributes are used: data-id on the message, role="slider" on the voice note
+// seek bar, aria-label and data-icon on the play button, and the <audio> element.
+// When WhatsApp Web changes its page, update this file.
 const WatSelectors = (() => {
   const MESSAGE = "[data-id]";
-  const AUDIO_ICON = /play|pause|audio|ptt/i;
   const PLAY_ICON = /play/i;
   // WhatsApp Web (as of 2026) marks the play button only by its aria-label, which
   // follows the interface language. Prefixes for some common languages are listed; any
@@ -16,10 +15,11 @@ const WatSelectors = (() => {
     return [...root.querySelectorAll(MESSAGE)].filter((el) => !el.parentElement?.closest(MESSAGE));
   }
 
+  // A voice note has a seek bar with a play button next to it. WhatsApp Web no longer
+  // marks voice notes with an audio data-icon, so icons are not required.
   function isAudioMessage(row) {
     if (row.querySelector("audio")) return true;
-    if (!row.querySelector('[role="slider"]')) return false;
-    return [...row.querySelectorAll("[data-icon]")].some((el) => AUDIO_ICON.test(el.getAttribute("data-icon")));
+    return !!row.querySelector('[role="slider"]') && playButton(row) !== null;
   }
 
   const messageId = (row) => row.getAttribute("data-id");
